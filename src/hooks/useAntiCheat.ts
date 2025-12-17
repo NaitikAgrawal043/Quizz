@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 
-export type ViolationType = 'tab_switch' | 'minimize' | 'fullscreen_exit';
+export type ViolationType = 'tab_switch' | 'minimize' | 'fullscreen_exit' | 'no_face' | 'multiple_faces' | 'camera_disabled';
 
 interface UseAntiCheatOptions {
     attemptId: string;

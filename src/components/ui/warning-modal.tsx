@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 
 interface WarningModalProps {
     isOpen: boolean;
-    violationType: 'tab_switch' | 'minimize' | 'fullscreen_exit' | null;
+    violationType: 'tab_switch' | 'minimize' | 'fullscreen_exit' | 'no_face' | 'multiple_faces' | 'camera_disabled' | null;
     violationCount: number;
     maxViolations: number;
     onDismiss: () => void;
@@ -23,6 +23,18 @@ const violationMessages: Record<string, { title: string; description: string }> 
     fullscreen_exit: {
         title: 'Fullscreen Exited!',
         description: 'You exited fullscreen mode. This is not allowed during the test.',
+    },
+    no_face: {
+        title: 'Face Not Detected!',
+        description: 'Your face was not visible to the camera. Please ensure your face is clearly visible.',
+    },
+    multiple_faces: {
+        title: 'Multiple Faces Detected!',
+        description: 'More than one person was detected. Only you should be visible during the test.',
+    },
+    camera_disabled: {
+        title: 'Camera Disabled!',
+        description: 'Your camera was turned off or blocked. The camera must remain active during the test.',
     },
 };
 
