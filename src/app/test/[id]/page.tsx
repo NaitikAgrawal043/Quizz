@@ -247,16 +247,18 @@ export default function TestPlayerPage({ params }: { params: Promise<{ id: strin
                                             <Label htmlFor={`integer-${currentQ._id}`}>Enter your answer (numeric)</Label>
                                             <Input
                                                 id={`integer-${currentQ._id}`}
-                                                type="number"
+                                                type="text"
+                                                inputMode="numeric"
                                                 placeholder="Enter a number..."
                                                 value={answers[currentQ._id] !== undefined && answers[currentQ._id] !== null ? answers[currentQ._id] : ''}
                                                 onChange={(e) => {
-                                                    const value = e.target.value;
+                                                    // Trim all whitespaces (start, end, and internal)
+                                                    const value = e.target.value.replace(/\s+/g, '');
                                                     if (value === '') {
                                                         handleAnswerChange(currentQ._id, null);
                                                     } else {
-                                                        // Store as number for proper comparison during grading
-                                                        handleAnswerChange(currentQ._id, Number(value));
+                                                        // Store as string to match database format
+                                                        handleAnswerChange(currentQ._id, value);
                                                     }
                                                 }}
                                                 className="max-w-xs"
