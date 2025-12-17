@@ -11,7 +11,7 @@ export default function Home() {
           Quiz Platform
         </h1>
         <p className="text-xl text-muted-foreground">
-          A secure, AI-powered testing environment for students and professionals.
+          A secure, Quiz environment for students and professionals.
         </p>
       </div>
 
