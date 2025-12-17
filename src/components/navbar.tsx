@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useSession, signOut } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { LogOut, User } from 'lucide-react';
+import Image from 'next/image';
 
 export default function Navbar() {
     const { data: session } = useSession();
@@ -12,7 +13,7 @@ export default function Navbar() {
         <nav className="border-b bg-background">
             <div className="container mx-auto px-4 h-16 flex items-center justify-between">
                 <Link href="/" className="text-xl font-bold">
-                    QuizApp
+                    <Image src="/image.png" alt="Logo" width={40} height={40} unoptimized priority />
                 </Link>
 
                 <div className="flex items-center gap-4">
