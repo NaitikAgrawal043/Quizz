@@ -12,6 +12,7 @@ export interface IUser extends Document {
   email: string;
   passwordHash?: string; // Optional for OAuth
   name: string;
+  rollNumber?: number;
   role: 'user' | 'admin';
   batches: mongoose.Types.ObjectId[]; // References to Batches
   createdAt: Date;
@@ -92,6 +93,7 @@ const UserSchema = new Schema<IUser>({
   email: { type: String, required: true, unique: true },
   passwordHash: { type: String },
   name: { type: String, required: true },
+  rollNumber: { type: Number, unique: true, sparse: true },
   role: { type: String, enum: ['user', 'admin'], default: 'user' },
   batches: [{ type: Schema.Types.ObjectId, ref: 'Batch' }],
   createdAt: { type: Date, default: Date.now },

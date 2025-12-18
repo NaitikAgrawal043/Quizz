@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, use } from 'react';
+import { useState, useEffect, useCallback, useRef, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -8,8 +8,9 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Clock, CheckCircle, AlertTriangle, Shield } from 'lucide-react';
-import { useAntiCheat } from '@/hooks/useAntiCheat';
+import { Loader2, Clock, AlertTriangle, Shield, Camera, User, Users } from 'lucide-react';
+import { useAntiCheat, ViolationType } from '@/hooks/useAntiCheat';
+import { useFaceDetection } from '@/hooks/useFaceDetection';
 import { WarningModal } from '@/components/ui/warning-modal';
 
 export default function TestPlayerPage({ params }: { params: Promise<{ id: string }> }) {
@@ -22,9 +23,17 @@ export default function TestPlayerPage({ params }: { params: Promise<{ id: strin
     const [saving, setSaving] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    // Face detection state
+    const [faceWarningType, setFaceWarningType] = useState<ViolationType | null>(null);
+    const lastFaceViolationRef = useRef<number>(0);
+    const FACE_VIOLATION_COOLDOWN = 5000; // 5 seconds between face violations
+
     const handleSubmit = useCallback(async () => {
         if (isSubmitting) return;
         setIsSubmitting(true);
+
+        // Stop camera
+        stopCamera();
 
         // Exit fullscreen before navigating
         if (document.fullscreenElement) {
@@ -54,10 +63,78 @@ export default function TestPlayerPage({ params }: { params: Promise<{ id: strin
         enabled: !!data && !isSubmitting
     });
 
+    // Face detection hook
+    const {
+        faceCount,
+        isLoading: isFaceLoading,
+        error: faceError,
+        videoRef,
+        startCamera,
+        stopCamera,
+        isCameraActive
+    } = useFaceDetection({
+        detectionInterval: 1000 // 1 FPS during test for performance
+    });
+
+    // Start camera when test loads
+    useEffect(() => {
+        if (data && !isSubmitting) {
+            startCamera();
+        }
+        return () => {
+            stopCamera();
+        };
+    }, [data, isSubmitting, startCamera, stopCamera]);
+
+    // Monitor face detection during test
+    useEffect(() => {
+        if (!data || isSubmitting || !isCameraActive) return;
+
+        const now = Date.now();
+        if (now - lastFaceViolationRef.current < FACE_VIOLATION_COOLDOWN) return;
+
+        if (faceCount === 0 && !isFaceLoading) {
+            // No face detected - record violation
+            lastFaceViolationRef.current = now;
+            recordFaceViolation('no_face');
+        } else if (faceCount > 1) {
+            // Multiple faces detected - record violation
+            lastFaceViolationRef.current = now;
+            recordFaceViolation('multiple_faces');
+        }
+    }, [faceCount, data, isSubmitting, isCameraActive, isFaceLoading]);
+
+    // Check for camera errors
+    useEffect(() => {
+        if (faceError && data && !isSubmitting) {
+            const now = Date.now();
+            if (now - lastFaceViolationRef.current >= FACE_VIOLATION_COOLDOWN) {
+                lastFaceViolationRef.current = now;
+                recordFaceViolation('camera_disabled');
+            }
+        }
+    }, [faceError, data, isSubmitting]);
+
+    // Record face violation to server
+    const recordFaceViolation = async (type: ViolationType) => {
+        try {
+            const res = await fetch(`/api/attempts/${id}/violation`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type })
+            });
+            const result = await res.json();
+            if (result.shouldAutoSubmit) {
+                handleSubmit();
+            }
+        } catch (error) {
+            console.error('Failed to record face violation:', error);
+        }
+    };
+
     // Enter fullscreen on mount
     useEffect(() => {
         if (data && !isSubmitting) {
-            // Small delay to ensure the page is fully loaded
             const timer = setTimeout(() => {
                 enterFullscreen();
             }, 500);
@@ -70,11 +147,9 @@ export default function TestPlayerPage({ params }: { params: Promise<{ id: strin
             .then(res => res.json())
             .then(data => {
                 setData(data);
-                // Initialize answers ONLY from saved answers (not all questions)
                 const initialAnswers: Record<string, any> = {};
                 if (data.attempt.answers && data.attempt.answers.length > 0) {
                     data.attempt.answers.forEach((a: any) => {
-                        // Only add if user actually provided an answer
                         if (a.givenAnswer !== null && a.givenAnswer !== undefined && a.givenAnswer !== '') {
                             initialAnswers[a.questionId] = a.givenAnswer;
                         }
@@ -82,18 +157,16 @@ export default function TestPlayerPage({ params }: { params: Promise<{ id: strin
                 }
                 setAnswers(initialAnswers);
 
-                // Calculate time left
                 const expiresAt = new Date(data.attempt.expiresAt).getTime();
                 const serverNow = new Date(data.serverNow).getTime();
                 const clientNow = Date.now();
-                const offset = serverNow - clientNow; // Approx offset
+                const offset = serverNow - clientNow;
 
                 const updateTimer = () => {
                     const now = Date.now() + offset;
                     const remaining = Math.max(0, Math.floor((expiresAt - now) / 1000));
                     setTimeLeft(remaining);
                     if (remaining <= 0) {
-                        // Auto submit
                         handleSubmit();
                     }
                 };
@@ -109,7 +182,6 @@ export default function TestPlayerPage({ params }: { params: Promise<{ id: strin
 
     const handleAnswerChange = (questionId: string, value: any) => {
         setAnswers(prev => ({ ...prev, [questionId]: value }));
-        // Debounced autosave could go here
         saveAnswer(questionId, value);
     };
 
@@ -129,13 +201,11 @@ export default function TestPlayerPage({ params }: { params: Promise<{ id: strin
     }, [id]);
 
     const handleClearAnswer = (questionId: string) => {
-        // Remove answer from local state
         setAnswers(prev => {
             const newAnswers = { ...prev };
             delete newAnswers[questionId];
             return newAnswers;
         });
-        // Save empty answer to server
         saveAnswer(questionId, null);
     };
 
@@ -152,6 +222,18 @@ export default function TestPlayerPage({ params }: { params: Promise<{ id: strin
         );
     }
 
+    // Face status indicator
+    const getFaceStatus = () => {
+        if (faceError) return { color: 'bg-red-500', icon: Camera, text: 'Camera Error' };
+        if (!isCameraActive) return { color: 'bg-yellow-500', icon: Camera, text: 'Camera Off' };
+        if (faceCount === 0) return { color: 'bg-yellow-500', icon: User, text: 'No Face' };
+        if (faceCount > 1) return { color: 'bg-red-500', icon: Users, text: 'Multiple' };
+        return { color: 'bg-green-500', icon: User, text: 'OK' };
+    };
+
+    const faceStatus = getFaceStatus();
+    const FaceIcon = faceStatus.icon;
+
     return (
         <div className="flex h-screen flex-col">
             {/* Warning Modal */}
@@ -167,18 +249,43 @@ export default function TestPlayerPage({ params }: { params: Promise<{ id: strin
             <header className="border-b p-4 flex justify-between items-center bg-background">
                 <div className="flex items-center gap-4">
                     <h1 className="font-bold text-lg">{data.test.title}</h1>
+
+                    {/* Face status indicator */}
+                    <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-white ${faceStatus.color}`}>
+                        <FaceIcon className="h-3 w-3" />
+                        {faceStatus.text}
+                    </div>
+
                     {/* Violation indicator */}
                     {violationCount > 0 && (
                         <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium ${violationCount >= maxViolations - 1
-                                ? 'bg-red-500/20 text-red-500'
-                                : 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-400'
+                            ? 'bg-red-500/20 text-red-500'
+                            : 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-400'
                             }`}>
                             <Shield className="h-3 w-3" />
                             {violationCount}/{maxViolations} warnings
                         </div>
                     )}
                 </div>
+
                 <div className="flex items-center gap-4">
+                    {/* Small camera preview */}
+                    <div className="relative w-16 h-12 rounded-lg overflow-hidden bg-black border-2 border-muted">
+                        <video
+                            ref={videoRef}
+                            autoPlay
+                            playsInline
+                            muted
+                            className="w-full h-full object-cover"
+                            style={{ transform: 'scaleX(-1)' }}
+                        />
+                        {!isCameraActive && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-muted">
+                                <Camera className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                        )}
+                    </div>
+
                     <div className={`flex items-center gap-2 font-mono text-xl ${timeLeft && timeLeft < 300 ? 'text-red-500' : ''}`}>
                         <Clock className="h-5 w-5" />
                         {timeLeft ? `${Math.floor(timeLeft / 60)}:${(timeLeft % 60).toString().padStart(2, '0')}` : '--:--'}
@@ -316,12 +423,10 @@ export default function TestPlayerPage({ params }: { params: Promise<{ id: strin
                                                 placeholder="Enter a number..."
                                                 value={answers[currentQ._id] !== undefined && answers[currentQ._id] !== null ? answers[currentQ._id] : ''}
                                                 onChange={(e) => {
-                                                    // Trim all whitespaces (start, end, and internal)
                                                     const value = e.target.value.replace(/\s+/g, '');
                                                     if (value === '') {
                                                         handleAnswerChange(currentQ._id, null);
                                                     } else {
-                                                        // Store as string to match database format
                                                         handleAnswerChange(currentQ._id, value);
                                                     }
                                                 }}

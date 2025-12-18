@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 
-export type ViolationType = 'tab_switch' | 'minimize' | 'fullscreen_exit';
+export type ViolationType = 'tab_switch' | 'minimize' | 'fullscreen_exit' | 'no_face' | 'multiple_faces' | 'camera_disabled';
 
 interface UseAntiCheatOptions {
     attemptId: string;
@@ -28,7 +28,7 @@ export function useAntiCheat({
 }: UseAntiCheatOptions): UseAntiCheatReturn {
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [violationCount, setViolationCount] = useState(0);
-    const [maxViolations, setMaxViolations] = useState(3);
+    const [maxViolations, setMaxViolations] = useState(5);
     const [showWarning, setShowWarning] = useState(false);
     const [lastViolationType, setLastViolationType] = useState<ViolationType | null>(null);
 
@@ -50,7 +50,7 @@ export function useAntiCheat({
             .then(data => {
                 if (isMounted.current && data.count !== undefined) {
                     setViolationCount(data.count);
-                    setMaxViolations(data.maxViolations || 3);
+                    setMaxViolations(data.maxViolations || 5);
                 }
             })
             .catch(console.error);
@@ -79,7 +79,7 @@ export function useAntiCheat({
 
             if (isMounted.current) {
                 setViolationCount(data.count);
-                setMaxViolations(data.maxViolations || 3);
+                setMaxViolations(data.maxViolations || 5);
 
                 if (data.shouldAutoSubmit) {
                     intentionalExit.current = true;

@@ -6,9 +6,9 @@ import bcrypt from 'bcryptjs';
 export async function POST(req: Request) {
     await dbConnect();
     try {
-        const { name, email, password, batchId } = await req.json();
+        const { name, email, password, batchId, rollNumber } = await req.json();
 
-        if (!name || !email || !password || !batchId) {
+        if (!name || !email || !password || !batchId || !rollNumber) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
 
@@ -17,12 +17,18 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Email already in use' }, { status: 400 });
         }
 
+        const existingRollNumber = await User.findOne({ rollNumber });
+        if (existingRollNumber) {
+            return NextResponse.json({ error: 'Roll Number already in use' }, { status: 400 });
+        }
+
         const passwordHash = await bcrypt.hash(password, 10);
 
         const user = await User.create({
             name,
             email,
             passwordHash,
+            rollNumber,
             batches: [batchId],
             role: 'user', // Default to user
         });

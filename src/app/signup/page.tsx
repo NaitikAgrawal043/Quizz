@@ -17,6 +17,7 @@ export default function SignupPage() {
         email: '',
         password: '',
         batchId: '',
+        rollNumber: '',
     });
     const [batches, setBatches] = useState<any[]>([]);
     const [error, setError] = useState('');
@@ -88,6 +89,17 @@ export default function SignupPage() {
                                 type="password"
                                 value={formData.password}
                                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                                required
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="rollNumber">Roll Number</Label>
+                            <Input
+                                id="rollNumber"
+                                type="number"
+                                value={formData.rollNumber}
+                                onChange={(e) => setFormData({ ...formData, rollNumber: e.target.value })}
                                 required
                             />
                         </div>

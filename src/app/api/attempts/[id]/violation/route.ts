@@ -18,7 +18,7 @@ export async function POST(
         const { id } = await params;
         const { type } = await request.json();
 
-        if (!type || !['tab_switch', 'minimize', 'fullscreen_exit'].includes(type)) {
+        if (!type || !['tab_switch', 'minimize', 'fullscreen_exit', 'no_face', 'multiple_faces', 'camera_disabled'].includes(type)) {
             return NextResponse.json({ error: 'Invalid violation type' }, { status: 400 });
         }
 
