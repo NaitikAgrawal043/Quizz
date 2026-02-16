@@ -98,7 +98,8 @@ export default function AdminDashboard() {
                                         Created: {new Date(test.createdAt).toLocaleDateString()}
                                     </p>
                                     <div className="mt-4 flex gap-2">
-                                        <Link href={`/admin/tests/${test._id}/edit`}>
+                                         <Link href={`/admin/tests/${test._id}/edit`}>
+                                        {/* <Link href={`/admin/tests/${test._id}/upload`}> */}
                                             <Button variant="outline" size="sm">Edit</Button>
                                         </Link>
                                         <Link href={`/admin/tests/${test._id}/results`}>

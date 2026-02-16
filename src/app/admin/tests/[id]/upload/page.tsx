@@ -1,5 +1,5 @@
 'use client';
-
+import { useEffect } from 'react';
 import { useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -151,11 +151,19 @@ export default function UploadPage({ params }: { params: Promise<{ id: string }>
 
         setSaving(true);
         try {
-            const res = await fetch(`/api/tests/${id}/questions`, {
-                method: 'POST',
+            // const res = await fetch(`/api/tests/${id}/questions`, {
+            //     method: 'POST',
+            //     headers: { 'Content-Type': 'application/json' },
+            //     body: JSON.stringify({ questions: validatedQuestions }),
+            // });
+            const res = await fetch(`/api/tests/${id}`, {
+                method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ questions: validatedQuestions }),
+                body: JSON.stringify({
+                    questions: validatedQuestions
+                }),
             });
+
 
             if (res.ok) {
                 router.push('/admin'); // Redirect to dashboard
@@ -213,6 +221,18 @@ export default function UploadPage({ params }: { params: Promise<{ id: string }>
         q.options.push({ id: nextId, text: '' });
         setQuestions(newQuestions);
     };
+    useEffect(() => {
+        const loadTest = async () => {
+            const res = await fetch(`/api/tests/${id}`);
+            const data = await res.json();
+
+            if (data.questions) {
+                setQuestions(data.questions);
+            }
+        };
+
+        loadTest();
+    }, [id]);
 
     const removeOption = (qIndex: number, optIndex: number) => {
         const newQuestions = [...questions];
@@ -476,3 +496,5 @@ export default function UploadPage({ params }: { params: Promise<{ id: string }>
         </div>
     );
 }
+
+
