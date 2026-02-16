@@ -45,18 +45,27 @@ export default function UploadPage({ params }: { params: Promise<{ id: string }>
         const formData = new FormData();
         formData.append('file', file);
 
+        const isPdf = file.name.toLowerCase().endsWith('.pdf');
+        const endpoint = isPdf ? `/api/tests/${id}/parse-pdf` : `/api/tests/${id}/upload`;
+
         try {
-            const res = await fetch(`/api/tests/${id}/upload`, {
+            const res = await fetch(endpoint, {
                 method: 'POST',
                 body: formData,
             });
             const data = await res.json();
 
             if (data.questions) {
-                setQuestions(data.questions);
+                // Ensure default values are applied just in case
+                const sanitizedQuestions = data.questions.map((q: any) => ({
+                    ...q,
+                    marks: q.marks ?? 1,
+                    negativeMarks: q.negativeMarks ?? 0
+                }));
+                setQuestions(sanitizedQuestions);
                 setErrors(data.errors || []);
             } else {
-                setErrors(['Failed to parse file']);
+                setErrors([data.error || 'Failed to parse file']);
             }
         } catch (err) {
             setErrors(['Upload failed']);
@@ -242,11 +251,14 @@ export default function UploadPage({ params }: { params: Promise<{ id: string }>
 
                 <TabsContent value="manual">
                     <Card>
+                        <CardHeader>
+                            <CardTitle>Upload Document (PDF or DOCX)</CardTitle>
+                        </CardHeader>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-4">
                                 <Input
                                     type="file"
-                                    accept=".docx"
+                                    accept=".docx,.pdf"
                                     onChange={e => setFile(e.target.files?.[0] || null)}
                                 />
                                 <Button onClick={handleUpload} disabled={!file || loading}>
@@ -260,6 +272,10 @@ export default function UploadPage({ params }: { params: Promise<{ id: string }>
                                     </Button>
                                 </a>
                             </div>
+                            <p className="text-xs text-muted-foreground mt-2">
+                                For PDFs, we'll try to automatically detect questions and answers.
+                                For DOCX, please follow the standard template format.
+                            </p>
                         </CardContent>
                     </Card>
                 </TabsContent>
