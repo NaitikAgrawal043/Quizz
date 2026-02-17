@@ -2,9 +2,14 @@ import { Worker } from 'bullmq';
 import IORedis from 'ioredis';
 import mongoose from 'mongoose';
 import { Attempt, Question } from '@/lib/db/models';
+import { extractPdfQuestions } from '@/lib/pdf-parse/extract';
 
 const connection = new IORedis(process.env.REDIS_URL || 'redis://localhost:6379', {
     maxRetriesPerRequest: null,
+});
+
+connection.on('error', (error) => {
+    console.error('[redis] worker connection error:', error.message);
 });
 
 // Reuse the grading logic (should be extracted to a service)
@@ -15,7 +20,7 @@ async function gradeAttempt(attemptId: string) {
     const questions = await Question.find({ testId: attempt.testId });
     let totalScore = 0;
 
-    const gradedAnswers = attempt.answers.map((ans: any) => {
+    const gradedAnswers = attempt.answers.map((ans: { questionId: { toString: () => string }; givenAnswer: unknown } & Record<string, unknown>) => {
         const question = questions.find(q => q._id.toString() === ans.questionId.toString());
         if (!question) return ans;
 
@@ -68,4 +73,49 @@ worker.on('completed', job => {
 
 worker.on('failed', (job, err) => {
     console.log(`${job?.id} has failed with ${err.message}`);
+});
+
+const parseWorkerConcurrency = Number.parseInt(process.env.PDF_PARSE_WORKER_CONCURRENCY || '2', 10) || 2;
+
+export const pdfParseWorker = new Worker('pdf-parse-queue', async job => {
+    if (job.name !== 'parse-pdf') return null;
+
+    const {
+        base64Data,
+        sourceType,
+        chapter,
+        unit,
+        chapterUnit,
+        maxQuestions,
+    } = job.data as {
+        base64Data: string;
+        sourceType: 'exam' | 'book';
+        chapter: string;
+        unit: string;
+        chapterUnit: string;
+        maxQuestions: number;
+    };
+
+    const questions = await extractPdfQuestions({
+        base64Data,
+        sourceType,
+        chapter,
+        unit,
+        chapterUnit,
+        maxQuestions,
+    });
+
+    return {
+        questions,
+        sourceType,
+        extractedCount: questions.length,
+    };
+}, { connection, concurrency: parseWorkerConcurrency });
+
+pdfParseWorker.on('completed', job => {
+    console.log(`pdf-parse job ${job.id} completed`);
+});
+
+pdfParseWorker.on('failed', (job, err) => {
+    console.log(`pdf-parse job ${job?.id} failed with ${err.message}`);
 });

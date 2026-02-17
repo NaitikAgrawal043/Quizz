@@ -41,6 +41,37 @@ export default function UploadPage({ params }: { params: Promise<{ id: string }>
     const [activeTab, setActiveTab] = useState('manual');
     const [numQuestions, setNumQuestions] = useState(5);
 
+    const pollParseJob = async (jobId: string) => {
+        const maxPolls = 90;
+        let polls = 0;
+
+        while (polls < maxPolls) {
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+
+            const statusRes = await fetch(`/api/tests/${id}/parse-pdf?jobId=${encodeURIComponent(jobId)}`);
+            const statusData = await statusRes.json();
+
+            if (statusData.status === 'completed' && statusData.questions) {
+                const sanitizedQuestions = statusData.questions.map((q: any) => ({
+                    ...q,
+                    marks: q.marks ?? 1,
+                    negativeMarks: q.negativeMarks ?? 0
+                }));
+                setQuestions(sanitizedQuestions);
+                return;
+            }
+
+            if (statusData.status === 'failed') {
+                setErrors([statusData.error || 'Failed to parse PDF in worker']);
+                return;
+            }
+
+            polls += 1;
+        }
+
+        setErrors(['Parsing is taking too long. Please try again in a bit.']);
+    };
+
     const handleUpload = async () => {
         if (!file) return;
         setLoading(true);
@@ -68,6 +99,8 @@ export default function UploadPage({ params }: { params: Promise<{ id: string }>
                 }));
                 setQuestions(sanitizedQuestions);
                 setErrors(data.errors || []);
+            } else if (res.status === 202 && data.jobId) {
+                await pollParseJob(String(data.jobId));
             } else {
                 setErrors([data.error || 'Failed to parse file']);
             }
@@ -105,6 +138,8 @@ export default function UploadPage({ params }: { params: Promise<{ id: string }>
                     negativeMarks: q.negativeMarks ?? 0
                 }));
                 setQuestions(sanitizedQuestions);
+            } else if (res.status === 202 && data.jobId) {
+                await pollParseJob(String(data.jobId));
             } else {
                 setErrors([data.error || 'Failed to extract questions from book PDF']);
             }
