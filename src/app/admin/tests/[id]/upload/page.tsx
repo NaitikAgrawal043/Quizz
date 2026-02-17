@@ -279,17 +279,10 @@ export default function UploadPage({ params }: { params: Promise<{ id: string }>
 
         setSaving(true);
         try {
-            // const res = await fetch(`/api/tests/${id}/questions`, {
-            //     method: 'POST',
-            //     headers: { 'Content-Type': 'application/json' },
-            //     body: JSON.stringify({ questions: validatedQuestions }),
-            // });
-            const res = await fetch(`/api/tests/${id}`, {
-                method: 'PUT',
+            const res = await fetch(`/api/tests/${id}/questions`, {
+                method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    questions: validatedQuestions
-                }),
+                body: JSON.stringify({ questions: validatedQuestions }),
             });
             // const res = await fetch(`/api/tests/${id}`, {
             //     method: 'PUT',
