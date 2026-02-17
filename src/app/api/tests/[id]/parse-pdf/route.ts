@@ -3,14 +3,63 @@ import { GoogleGenerativeAI, SchemaType, Schema } from '@google/generative-ai';
 import dbConnect from '@/lib/db/connect';
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!);
+type SourceType = 'exam' | 'book';
 
-export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+function toPositiveInt(value: string | null, fallback: number): number {
+    if (!value) return fallback;
+    const parsed = Number.parseInt(value, 10);
+    return Number.isNaN(parsed) || parsed <= 0 ? fallback : parsed;
+}
+
+function buildPrompt(
+    sourceType: SourceType,
+    scope: { chapter: string; unit: string; chapterUnit: string; maxQuestions: number }
+): string {
+    const filters = [
+        scope.chapterUnit ? `chapter/unit text: "${scope.chapterUnit}"` : '',
+        scope.chapter ? `chapter: "${scope.chapter}"` : '',
+        scope.unit ? `unit: "${scope.unit}"` : '',
+    ].filter(Boolean);
+
+    const scopeInstruction = filters.length > 0
+        ? `Focus only on content matching: ${filters.join(', ')}.`
+        : 'If no chapter/unit hint is provided, focus on clearly marked exercise/practice/problem sections.';
+
+    if (sourceType === 'book') {
+        return `Analyze the provided BOOK PDF and extract exercise questions into a JSON array.
+Rules:
+1. Extract only exercise/practice/end-of-chapter questions (not theory paragraphs).
+2. ${scopeInstruction}
+3. Return at most ${scope.maxQuestions} questions.
+4. Keep full question stems.
+5. Include options for objective questions when available.
+6. If answer key exists, set correctAnswer from it; otherwise keep correctAnswer as an empty string.
+7. Default marks: 1, Negative marks: 0.
+8. Return valid JSON matching the schema only.`;
+    }
+
+    return `Analyze the provided PDF document and extract all questions into a JSON array.
+Follow these rules strictly:
+1. Identify all questions, options, and answers.
+2. If there's an answer key table, use it to set the 'correctAnswer'.
+3. Default marks: 1, Negative marks: 0.
+4. Ensure the 'stem' contains the full question text.
+5. Return at most ${scope.maxQuestions} questions.
+6. Provide a valid JSON array matching the schema.`;
+}
+
+export async function POST(req: Request, _context: { params: Promise<{ id: string }> }) {
     try {
         await dbConnect();
-        // const { id } = await params; // Unused but keep if needed for future
 
         const formData = await req.formData();
-        const file = formData.get('file') as File;
+        const file = formData.get('file') as File | null;
+        const sourceTypeRaw = (formData.get('sourceType') as string | null)?.toLowerCase();
+        const sourceType: SourceType = sourceTypeRaw === 'book' ? 'book' : 'exam';
+        const chapter = (formData.get('chapter') as string | null)?.trim() || '';
+        const unit = (formData.get('unit') as string | null)?.trim() || '';
+        const chapterUnit = (formData.get('chapterUnit') as string | null)?.trim() || '';
+        const maxQuestions = toPositiveInt(formData.get('maxQuestions') as string | null, 30);
 
         if (!file) {
             return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
@@ -57,13 +106,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             }
         });
 
-        const prompt = `Analyze the provided PDF document and extract all questions into a JSON array.
-Follow these rules strictly:
-1. Identify all questions, options, and answers.
-2. If there's an answer key table, use it to set the 'correctAnswer'.
-3. Default marks: 1, Negative marks: 0.
-4. Ensure the 'stem' contains the full question text.
-5. Provide a valid JSON array matching the schema.`;
+        const prompt = buildPrompt(sourceType, { chapter, unit, chapterUnit, maxQuestions });
 
         const result = await model.generateContent([
             { text: prompt },
@@ -100,17 +143,28 @@ Follow these rules strictly:
 
             // Consistency check and sanitization
             const validQuestions = questionsArray.map((q: any) => ({
-                section: q.section || 'General',
-                type: q.type || 'mcq',
+                section: q.section || (sourceType === 'book' ? 'Book Exercises' : 'General'),
+                type: ['mcq', 'multi-mcq', 'integer', 'short'].includes(q.type) ? q.type : 'mcq',
                 stem: q.stem || '',
-                options: Array.isArray(q.options) ? q.options : [],
-                correctAnswer: q.correctAnswer,
+                options: Array.isArray(q.options)
+                    ? q.options.map((opt: any, idx: number) => ({
+                        id: String(opt?.id ?? String.fromCharCode(97 + idx)).toLowerCase(),
+                        text: String(opt?.text ?? '').trim(),
+                    }))
+                    : [],
+                correctAnswer: String(q.correctAnswer ?? '').trim(),
                 marks: typeof q.marks === 'number' ? q.marks : 1,
                 negativeMarks: typeof q.negativeMarks === 'number' ? q.negativeMarks : 0,
                 explanation: q.explanation || ''
-            }));
+            }))
+                .filter((q: any) => q.stem?.trim())
+                .slice(0, maxQuestions);
 
-            return NextResponse.json({ questions: validQuestions });
+            return NextResponse.json({
+                questions: validQuestions,
+                sourceType,
+                extractedCount: validQuestions.length
+            });
         } catch (e) {
             console.error('Final JSON Parse Error:', e);
             return NextResponse.json({

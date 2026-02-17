@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, Upload, CheckCircle, AlertTriangle, Download, Bot, FileText, Keyboard, Plus, Trash2 } from 'lucide-react';
+import { Loader2, Upload, CheckCircle, AlertTriangle, Download, BookOpen, FileText, Keyboard, Plus, Trash2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -33,7 +33,11 @@ export default function UploadPage({ params }: { params: Promise<{ id: string }>
     const [errors, setErrors] = useState<string[]>([]);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
-    const [aiPrompt, setAiPrompt] = useState('');
+    const [bookFile, setBookFile] = useState<File | null>(null);
+    const [chapter, setChapter] = useState('');
+    const [unit, setUnit] = useState('');
+    const [chapterUnit, setChapterUnit] = useState('');
+    const [maxQuestions, setMaxQuestions] = useState(30);
     const [activeTab, setActiveTab] = useState('manual');
     const [numQuestions, setNumQuestions] = useState(5);
 
@@ -74,29 +78,38 @@ export default function UploadPage({ params }: { params: Promise<{ id: string }>
         }
     };
 
-    const handleAiGenerate = async () => {
-        if (!file) return;
+    const handleBookExtract = async () => {
+        if (!bookFile) return;
         setLoading(true);
         setErrors([]);
 
         const formData = new FormData();
-        formData.append('file', file);
-        formData.append('prompt', aiPrompt);
+        formData.append('file', bookFile);
+        formData.append('sourceType', 'book');
+        formData.append('chapter', chapter.trim());
+        formData.append('unit', unit.trim());
+        formData.append('chapterUnit', chapterUnit.trim());
+        formData.append('maxQuestions', String(maxQuestions || 30));
 
         try {
-            const res = await fetch(`/api/tests/${id}/generate-ai`, {
+            const res = await fetch(`/api/tests/${id}/parse-pdf`, {
                 method: 'POST',
                 body: formData,
             });
             const data = await res.json();
 
             if (data.questions) {
-                setQuestions(data.questions);
+                const sanitizedQuestions = data.questions.map((q: any) => ({
+                    ...q,
+                    marks: q.marks ?? 1,
+                    negativeMarks: q.negativeMarks ?? 0
+                }));
+                setQuestions(sanitizedQuestions);
             } else {
-                setErrors([data.error || 'Failed to generate questions']);
+                setErrors([data.error || 'Failed to extract questions from book PDF']);
             }
         } catch (err) {
-            setErrors(['AI generation failed']);
+            setErrors(['Book extraction failed']);
         } finally {
             setLoading(false);
         }
@@ -239,9 +252,9 @@ export default function UploadPage({ params }: { params: Promise<{ id: string }>
                         <FileText className="mr-2 h-4 w-4" />
                         Manual Upload (DOCX)
                     </TabsTrigger>
-                    <TabsTrigger value="ai">
-                        <Bot className="mr-2 h-4 w-4" />
-                        Generate with AI (PDF)
+                    <TabsTrigger value="book">
+                        <BookOpen className="mr-2 h-4 w-4" />
+                        Upload Book PDF
                     </TabsTrigger>
                     <TabsTrigger value="manual-type">
                         <Keyboard className="mr-2 h-4 w-4" />
@@ -280,31 +293,57 @@ export default function UploadPage({ params }: { params: Promise<{ id: string }>
                     </Card>
                 </TabsContent>
 
-                <TabsContent value="ai">
+                <TabsContent value="book">
                     <Card>
                         <CardHeader>
-                            <CardTitle>Generate Questions from PDF</CardTitle>
+                            <CardTitle>Upload Book PDF and Extract Exercise Questions</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="space-y-2">
-                                <Label>Upload PDF Document</Label>
+                                <Label>Book PDF</Label>
                                 <Input
                                     type="file"
                                     accept=".pdf"
-                                    onChange={e => setFile(e.target.files?.[0] || null)}
+                                    onChange={e => setBookFile(e.target.files?.[0] || null)}
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label>Instructions for AI (Optional)</Label>
-                                <Textarea
-                                    placeholder="e.g., Create 10 hard physics questions focusing on mechanics..."
-                                    value={aiPrompt}
-                                    onChange={e => setAiPrompt(e.target.value)}
+                                <Label>Chapter (Optional)</Label>
+                                <Input
+                                    placeholder="e.g., Chapter 6"
+                                    value={chapter}
+                                    onChange={e => setChapter(e.target.value)}
                                 />
                             </div>
-                            <Button onClick={handleAiGenerate} disabled={!file || loading} className="w-full">
-                                {loading ? <Loader2 className="animate-spin mr-2" /> : <Bot className="mr-2" />}
-                                Generate Questions
+                            <div className="space-y-2">
+                                <Label>Unit (Optional)</Label>
+                                <Input
+                                    placeholder="e.g., Unit 2"
+                                    value={unit}
+                                    onChange={e => setUnit(e.target.value)}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Chapter/Unit Hint (Optional)</Label>
+                                <Input
+                                    placeholder="e.g., Gravitation exercises only"
+                                    value={chapterUnit}
+                                    onChange={e => setChapterUnit(e.target.value)}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Max Questions</Label>
+                                <Input
+                                    type="number"
+                                    min={1}
+                                    max={200}
+                                    value={maxQuestions}
+                                    onChange={e => setMaxQuestions(parseInt(e.target.value) || 30)}
+                                />
+                            </div>
+                            <Button onClick={handleBookExtract} disabled={!bookFile || loading} className="w-full">
+                                {loading ? <Loader2 className="animate-spin mr-2" /> : <BookOpen className="mr-2" />}
+                                Extract Exercise Questions
                             </Button>
                         </CardContent>
                     </Card>
@@ -351,7 +390,7 @@ export default function UploadPage({ params }: { params: Promise<{ id: string }>
             {questions.length > 0 && (
                 <div className="space-y-4">
                     <div className="flex justify-between items-center">
-                        <h2 className="text-xl font-semibold">Parsed Questions ({questions.length})</h2>
+                        <h2 className="text-xl font-semibold">Question Preview ({questions.length})</h2>
                         <Button onClick={handleSave} disabled={saving}>
                             {saving ? <Loader2 className="animate-spin mr-2" /> : <CheckCircle className="mr-2" />}
                             Confirm & Save
