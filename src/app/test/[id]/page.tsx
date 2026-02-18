@@ -48,7 +48,7 @@ export default function TestPlayerPage({ params }: { params: Promise<{ id: strin
         }
 
         await fetch(`/api/attempts/${id}/submit`, { method: 'POST' });
-        router.push(`/test/${id}/result`);
+        router.push('/dashboard?submitted=true');
     }, [id, router, isSubmitting]);
 
     // Anti-cheat hook
