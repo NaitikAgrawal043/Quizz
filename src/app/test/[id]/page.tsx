@@ -8,10 +8,11 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Clock, AlertTriangle, Shield, Camera, User, Users } from 'lucide-react';
+import { Loader2, Clock, AlertTriangle, Shield, Camera, User, Users, Radio } from 'lucide-react';
 import { useAntiCheat, ViolationType } from '@/hooks/useAntiCheat';
 import { useFaceDetection } from '@/hooks/useFaceDetection';
 import { WarningModal } from '@/components/ui/warning-modal';
+import { useTestSocket } from '@/hooks/useTestSocket';
 
 export default function TestPlayerPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
@@ -19,9 +20,12 @@ export default function TestPlayerPage({ params }: { params: Promise<{ id: strin
     const [data, setData] = useState<any>(null);
     const [currentQIndex, setCurrentQIndex] = useState(0);
     const [answers, setAnswers] = useState<Record<string, any>>({});
-    const [timeLeft, setTimeLeft] = useState<number | null>(null);
+    // Removed global timeLeft
+    const [questionTimeLeft, setQuestionTimeLeft] = useState<number | null>(null);
     const [saving, setSaving] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isLiveSession, setIsLiveSession] = useState(false);
+    const [liveTestId, setLiveTestId] = useState<string | null>(null);
 
     // Face detection state
     const [faceWarningType, setFaceWarningType] = useState<ViolationType | null>(null);
@@ -157,28 +161,85 @@ export default function TestPlayerPage({ params }: { params: Promise<{ id: strin
                 }
                 setAnswers(initialAnswers);
 
-                const expiresAt = new Date(data.attempt.expiresAt).getTime();
-                const serverNow = new Date(data.serverNow).getTime();
-                const clientNow = Date.now();
-                const offset = serverNow - clientNow;
+                // Initialize timer for the first question
+                if (data.questions && data.questions.length > 0) {
+                    setQuestionTimeLeft(data.questions[0].timeLimit || 60);
+                }
 
-                const updateTimer = () => {
-                    const now = Date.now() + offset;
-                    const remaining = Math.max(0, Math.floor((expiresAt - now) / 1000));
-                    setTimeLeft(remaining);
-                    if (remaining <= 0) {
-                        handleSubmit();
-                    }
-                };
-
-                updateTimer();
-                const interval = setInterval(updateTimer, 1000);
-                return () => clearInterval(interval);
+                // Check if there's a live session for this test
+                const testId = data.attempt?.testId;
+                if (testId) {
+                    setLiveTestId(testId);
+                    fetch(`/api/sessions/${testId}`)
+                        .then(res => res.ok ? res.json() : null)
+                        .then(session => {
+                            if (session && (session.status === 'active' || session.status === 'paused')) {
+                                setIsLiveSession(true);
+                                setCurrentQIndex(session.currentQuestionIndex);
+                            }
+                        })
+                        .catch(() => { }); // No live session, that's fine
+                }
             })
             .catch(err => {
                 console.error('Failed to load test data', err);
             });
     }, [id]);
+
+    const handleQuestionTimeout = useCallback(() => {
+        // Auto-save current answer (already handled by onChange mostly, but maybe force save?)
+        // Move to next question or submit
+        if (!data) return;
+
+        if (currentQIndex < data.questions.length - 1) {
+            setCurrentQIndex(prev => prev + 1);
+        } else {
+            // Last question - auto submit
+            handleSubmit();
+        }
+    }, [currentQIndex, data, handleSubmit]);
+
+    // Timer logic for per-question time
+    useEffect(() => {
+        if (!data || isSubmitting) return;
+
+        const timer = setInterval(() => {
+            setQuestionTimeLeft((prev) => {
+                if (prev === null) return null;
+                if (prev <= 1) {
+                    // Time's up for this question
+                    handleQuestionTimeout();
+                    return 0; // Stick at 0 or reset
+                }
+                return prev - 1;
+            });
+        }, 1000);
+
+        return () => clearInterval(timer);
+    }, [data, isSubmitting, currentQIndex]); // Dependencies need to be careful here
+
+    // Reset timer when question changes
+    useEffect(() => {
+        if (data && data.questions && data.questions[currentQIndex]) {
+            setQuestionTimeLeft(data.questions[currentQIndex].timeLimit || 60);
+        }
+    }, [currentQIndex, data]);
+
+    // --- Real-Time Sync (WebSocket) ---
+    const { syncState } = useTestSocket(liveTestId || '');
+
+    useEffect(() => {
+        if (!isLiveSession || !syncState) return;
+
+        // Update question index from teacher's broadcast
+        setCurrentQIndex(syncState.currentQuestionIndex);
+
+        // If teacher ended the test, auto-submit
+        if (syncState.status === 'finished') {
+            handleSubmit();
+        }
+    }, [syncState, isLiveSession]);
+
 
     const handleAnswerChange = (questionId: string, value: any) => {
         setAnswers(prev => ({ ...prev, [questionId]: value }));
@@ -250,6 +311,14 @@ export default function TestPlayerPage({ params }: { params: Promise<{ id: strin
                 <div className="flex items-center gap-4">
                     <h1 className="font-bold text-lg">{data.test.title}</h1>
 
+                    {/* Live session indicator */}
+                    {isLiveSession && (
+                        <div className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium bg-red-500 text-white animate-pulse">
+                            <Radio className="h-3 w-3" />
+                            LIVE
+                        </div>
+                    )}
+
                     {/* Face status indicator */}
                     <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-white ${faceStatus.color}`}>
                         <FaceIcon className="h-3 w-3" />
@@ -286,9 +355,9 @@ export default function TestPlayerPage({ params }: { params: Promise<{ id: strin
                         )}
                     </div>
 
-                    <div className={`flex items-center gap-2 font-mono text-xl ${timeLeft && timeLeft < 300 ? 'text-red-500' : ''}`}>
+                    <div className={`flex items-center gap-2 font-mono text-xl ${questionTimeLeft && questionTimeLeft < 10 ? 'text-red-500' : ''}`}>
                         <Clock className="h-5 w-5" />
-                        {timeLeft ? `${Math.floor(timeLeft / 60)}:${(timeLeft % 60).toString().padStart(2, '0')}` : '--:--'}
+                        {questionTimeLeft !== null ? `${Math.floor(questionTimeLeft / 60)}:${(questionTimeLeft % 60).toString().padStart(2, '0')}` : '--:--'}
                     </div>
                     <Button variant="destructive" onClick={handleSubmit} disabled={isSubmitting}>
                         {isSubmitting ? 'Submitting...' : 'Submit Test'}
@@ -314,6 +383,7 @@ export default function TestPlayerPage({ params }: { params: Promise<{ id: strin
                                     size="sm"
                                     className="w-full"
                                     onClick={() => setCurrentQIndex(i)}
+                                    disabled={isLiveSession}
                                 >
                                     {i + 1}
                                 </Button>
@@ -483,13 +553,13 @@ export default function TestPlayerPage({ params }: { params: Promise<{ id: strin
                             <Button
                                 variant="outline"
                                 onClick={() => setCurrentQIndex(Math.max(0, currentQIndex - 1))}
-                                disabled={currentQIndex === 0}
+                                disabled={currentQIndex === 0 || isLiveSession}
                             >
                                 Previous
                             </Button>
                             <Button
                                 onClick={() => setCurrentQIndex(Math.min(data.questions.length - 1, currentQIndex + 1))}
-                                disabled={currentQIndex === data.questions.length - 1}
+                                disabled={currentQIndex === data.questions.length - 1 || isLiveSession}
                             >
                                 Next
                             </Button>

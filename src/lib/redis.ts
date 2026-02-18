@@ -76,4 +76,39 @@ export function getMaxViolations(): number {
     return MAX_VIOLATIONS;
 }
 
+// --- Pub/Sub for Real-Time Sync ---
+
+let redisPub: IORedis | null = null;
+let redisSub: IORedis | null = null;
+
+/**
+ * Get a dedicated Redis publisher instance for pub/sub
+ * (separate from the main client to avoid conflicts)
+ */
+export function getRedisPublisher(): IORedis {
+    if (!redisPub) {
+        redisPub = new IORedis(process.env.REDIS_URL || 'redis://localhost:6379', {
+            maxRetriesPerRequest: null,
+            lazyConnect: false,
+        });
+        redisPub.on('error', (err) => console.error('Redis Publisher Error:', err));
+    }
+    return redisPub;
+}
+
+/**
+ * Get a dedicated Redis subscriber instance for pub/sub
+ * (a Redis client in subscribe mode cannot do other commands)
+ */
+export function getRedisSubscriber(): IORedis {
+    if (!redisSub) {
+        redisSub = new IORedis(process.env.REDIS_URL || 'redis://localhost:6379', {
+            maxRetriesPerRequest: null,
+            lazyConnect: false,
+        });
+        redisSub.on('error', (err) => console.error('Redis Subscriber Error:', err));
+    }
+    return redisSub;
+}
+
 export default redis;

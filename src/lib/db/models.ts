@@ -35,6 +35,7 @@ export interface IQuestion extends Document {
   negativeMarks: number;
   explanation?: string; // HTML
   needsManualReview: boolean;
+  timeLimit?: number; // Time limit in seconds for this specific question
   createdAt: Date;
 }
 
@@ -81,6 +82,14 @@ export interface IAttempt extends Document {
   createdAt: Date;
 }
 
+export interface ITestSession extends Document {
+  testId: mongoose.Types.ObjectId;
+  status: 'waiting' | 'active' | 'paused' | 'finished';
+  currentQuestionIndex: number;
+  startedAt?: Date;
+  updatedAt: Date;
+}
+
 // --- Schemas ---
 
 const BatchSchema = new Schema<IBatch>({
@@ -114,6 +123,7 @@ const QuestionSchema = new Schema<IQuestion>({
   negativeMarks: { type: Number, default: 0 },
   explanation: { type: String },
   needsManualReview: { type: Boolean, default: false },
+  timeLimit: { type: Number, default: 60 }, // Default 60 seconds per question
   createdAt: { type: Date, default: Date.now },
 });
 
@@ -156,6 +166,14 @@ const AttemptSchema = new Schema<IAttempt>({
   createdAt: { type: Date, default: Date.now },
 });
 
+const TestSessionSchema = new Schema<ITestSession>({
+  testId: { type: Schema.Types.ObjectId, ref: 'Test', required: true, unique: true },
+  status: { type: String, enum: ['waiting', 'active', 'paused', 'finished'], default: 'waiting' },
+  currentQuestionIndex: { type: Number, default: 0 },
+  startedAt: { type: Date },
+  updatedAt: { type: Date, default: Date.now },
+});
+
 // --- Models ---
 
 // Prevent overwriting models if they are already compiled (hot reload)
@@ -164,3 +182,4 @@ export const User = mongoose.models.User || mongoose.model<IUser>('User', UserSc
 export const Test = mongoose.models.Test || mongoose.model<ITest>('Test', TestSchema);
 export const Question = mongoose.models.Question || mongoose.model<IQuestion>('Question', QuestionSchema);
 export const Attempt = mongoose.models.Attempt || mongoose.model<IAttempt>('Attempt', AttemptSchema);
+export const TestSession = mongoose.models.TestSession || mongoose.model<ITestSession>('TestSession', TestSessionSchema);

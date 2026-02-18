@@ -2,6 +2,18 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/db/connect';
 import { Question, Test } from '@/lib/db/models';
 
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+    await dbConnect();
+    try {
+        const { id } = await params;
+        const questions = await Question.find({ testId: id }).lean();
+        return NextResponse.json(questions);
+    } catch (error) {
+        console.error('Fetch questions error:', error);
+        return NextResponse.json({ error: 'Failed to fetch questions' }, { status: 500 });
+    }
+}
+
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
     await dbConnect();
     try {
