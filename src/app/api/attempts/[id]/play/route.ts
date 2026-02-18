@@ -24,6 +24,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
             stem: q.stem,
             options: q.options,
             marks: q.marks,
+            timeLimit: q.timeLimit || 60, // Default to 60s if not set
             // correct answer and explanation removed
         }));
 

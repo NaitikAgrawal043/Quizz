@@ -23,6 +23,7 @@ interface ParsedQuestion {
     marks: number;
     negativeMarks?: number;
     explanation?: string;
+    timeLimit?: number;
 }
 
 export default function UploadPage({ params }: { params: Promise<{ id: string }> }) {
@@ -164,7 +165,8 @@ export default function UploadPage({ params }: { params: Promise<{ id: string }>
             correctAnswer: '',
             marks: 1,
             negativeMarks: 0,
-            explanation: ''
+            explanation: '',
+            timeLimit: 60
         }));
         setQuestions(newQuestions);
         setErrors([]);
@@ -516,6 +518,15 @@ export default function UploadPage({ params }: { params: Promise<{ id: string }>
                                                     step="0.25"
                                                     value={q.negativeMarks || 0}
                                                     onChange={e => updateQuestion(i, 'negativeMarks', parseFloat(e.target.value))}
+                                                />
+                                            </div>
+                                            <div>
+                                                <Label>Time Limit (sec)</Label>
+                                                <Input
+                                                    type="number"
+                                                    min="10"
+                                                    value={q.timeLimit || 60}
+                                                    onChange={e => updateQuestion(i, 'timeLimit', parseInt(e.target.value))}
                                                 />
                                             </div>
                                         </div>

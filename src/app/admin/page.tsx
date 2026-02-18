@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PlusCircle, FileText, Users } from 'lucide-react';
+import { PlusCircle, FileText, Users, Trash2, Radio } from 'lucide-react';
 
 interface TestSummary {
     _id: string;
@@ -50,6 +50,28 @@ export default function AdminDashboard() {
                 setLoading(false);
             });
     }, [status, session, router]);
+
+    const handleDeleteTest = async (testId: string, testTitle: string) => {
+        if (!confirm(`Are you sure you want to delete "${testTitle}"? This action cannot be undone.`)) {
+            return;
+        }
+
+        try {
+            const res = await fetch(`/api/tests/${testId}`, {
+                method: 'DELETE',
+            });
+
+            if (res.ok) {
+                setTests(prev => prev.filter(t => t._id !== testId));
+            } else {
+                console.error('Failed to delete test');
+                alert('Failed to delete test');
+            }
+        } catch (error) {
+            console.error('Error deleting test:', error);
+            alert('Error deleting test');
+        }
+    };
 
     return (
         <div className="container mx-auto p-6 space-y-8">
@@ -98,13 +120,26 @@ export default function AdminDashboard() {
                                         Created: {new Date(test.createdAt).toLocaleDateString()}
                                     </p>
                                     <div className="mt-4 flex gap-2">
-                                         <Link href={`/admin/tests/${test._id}/edit`}>
-                                        {/* <Link href={`/admin/tests/${test._id}/upload`}> */}
+                                        <Link href={`/admin/tests/${test._id}/edit`}>
+                                            {/* <Link href={`/admin/tests/${test._id}/upload`}> */}
                                             <Button variant="outline" size="sm">Edit</Button>
                                         </Link>
                                         <Link href={`/admin/tests/${test._id}/results`}>
                                             <Button variant="secondary" size="sm">Results</Button>
                                         </Link>
+                                        <Link href={`/admin/tests/${test._id}/live`}>
+                                            <Button variant="default" size="sm" className="gap-1">
+                                                <Radio className="h-3 w-3" />
+                                                Go Live
+                                            </Button>
+                                        </Link>
+                                        <Button
+                                            variant="destructive"
+                                            size="sm"
+                                            onClick={() => handleDeleteTest(test._id, test.title)}
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
                                     </div>
                                 </CardContent>
                             </Card>
