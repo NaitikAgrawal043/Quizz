@@ -16,16 +16,33 @@ export default function ResultPage({ params }: { params: Promise<{ id: string }>
     const [aiOpen, setAiOpen] = useState<Record<number, boolean>>({});
 
     useEffect(() => {
-        fetch(`/api/attempts/${id}/result`)
-            .then(res => res.json())
-            .then(data => {
-                setData(data);
+        let cancelled = false;
+        let timer: ReturnType<typeof setTimeout>;
+
+        const fetchResult = async () => {
+            try {
+                const res = await fetch(`/api/attempts/${id}/result`);
+                const json = await res.json();
+
+                if (cancelled) return;
+
+                // 202 = still grading — retry in 2 s
+                if (res.status === 202) {
+                    setData({ grading: true, message: json.message });
+                    timer = setTimeout(fetchResult, 2000);
+                    return;
+                }
+
+                setData(json);
                 setLoading(false);
-            })
-            .catch(err => {
+            } catch (err) {
                 console.error('Failed to fetch results', err);
-                setLoading(false);
-            });
+                if (!cancelled) setLoading(false);
+            }
+        };
+
+        fetchResult();
+        return () => { cancelled = true; clearTimeout(timer); };
     }, [id]);
 
     // Function to convert LaTeX notation and markdown to readable format
@@ -116,6 +133,12 @@ export default function ResultPage({ params }: { params: Promise<{ id: string }>
     };
 
     if (loading) return <div className="flex justify-center p-10"><Loader2 className="animate-spin" /></div>;
+    if (data?.grading) return (
+        <div className="flex flex-col items-center justify-center p-20 gap-4">
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+            <p className="text-lg text-muted-foreground">{data.message || 'Grading your answers…'}</p>
+        </div>
+    );
     if (!data || data.message) return <div className="p-10 text-center">{data?.message || 'No results available'}</div>;
 
     return (

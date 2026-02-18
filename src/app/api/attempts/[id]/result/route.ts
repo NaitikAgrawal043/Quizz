@@ -1,16 +1,32 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/db/connect';
 import { Attempt, Question } from '@/lib/db/models';
+import { gradeAttempt } from '@/lib/grading';
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
     await dbConnect();
     try {
         const { id } = await params;
         const attemptId = id;
-        const attempt = await Attempt.findById(attemptId).lean();
+        let attempt = await Attempt.findById(attemptId).lean();
 
         if (!attempt) {
             return NextResponse.json({ error: 'Attempt not found' }, { status: 404 });
+        }
+
+        // Auto-recover stuck 'grading' attempts — grade them on the spot
+        if (attempt.status === 'grading') {
+            await gradeAttempt(attemptId);
+            attempt = await Attempt.findById(attemptId).lean();
+            if (!attempt) {
+                return NextResponse.json({ error: 'Attempt not found' }, { status: 404 });
+            }
+        }
+
+        if (attempt.status === 'in_progress') {
+            return NextResponse.json(
+                { status: 'in_progress', message: 'This test has not been submitted yet.' },
+            );
         }
 
         // Check visibility policy
