@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useState, use } from 'react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Loader2, Bot, ChevronDown, ChevronUp } from 'lucide-react';
+import { Loader2, Bot, ChevronDown, ChevronUp, ArrowLeft } from 'lucide-react';
 
 export default function ResultPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
@@ -120,6 +121,13 @@ export default function ResultPage({ params }: { params: Promise<{ id: string }>
 
     return (
         <div className="container mx-auto p-6 space-y-8">
+            <Link href="/dashboard">
+                <Button variant="ghost" className="mb-4 pl-0 hover:pl-2 transition-all">
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Back to Dashboard
+                </Button>
+            </Link>
+
             <Card className="bg-primary/5 border-primary/20">
                 <CardHeader>
                     <CardTitle className="text-center text-3xl">Test Results</CardTitle>
