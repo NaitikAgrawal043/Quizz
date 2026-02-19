@@ -25,29 +25,35 @@ app.prepare().then(async () => {
     // --- Redis Subscriber for cross-process events ---
     const redisSub = getRedisSubscriber();
 
-    redisSub.subscribe('test-control', (err) => {
-        if (err) {
-            console.error('Failed to subscribe to test-control channel:', err);
-        } else {
-            console.log('✅ Subscribed to Redis channel: test-control');
-        }
-    });
-
-    redisSub.on('message', (channel, message) => {
-        if (channel === 'test-control') {
-            try {
-                const data = JSON.parse(message);
-                // Broadcast to all clients in the specific test room
-                io.to(`test:${data.testId}`).emit('state-change', {
-                    currentQuestionIndex: data.currentQuestionIndex,
-                    status: data.status,
-                });
-                console.log(`📡 Broadcast to test:${data.testId}`, data);
-            } catch (e) {
-                console.error('Failed to parse Redis message:', e);
+    // Try to connect and subscribe; skip gracefully if Redis is unavailable
+    try {
+        await redisSub.connect();
+        redisSub.subscribe('test-control', (err) => {
+            if (err) {
+                console.error('Failed to subscribe to test-control channel:', err);
+            } else {
+                console.log('✅ Subscribed to Redis channel: test-control');
             }
-        }
-    });
+        });
+
+        redisSub.on('message', (channel, message) => {
+            if (channel === 'test-control') {
+                try {
+                    const data = JSON.parse(message);
+                    // Broadcast to all clients in the specific test room
+                    io.to(`test:${data.testId}`).emit('state-change', {
+                        currentQuestionIndex: data.currentQuestionIndex,
+                        status: data.status,
+                    });
+                    console.log(`📡 Broadcast to test:${data.testId}`, data);
+                } catch (e) {
+                    console.error('Failed to parse Redis message:', e);
+                }
+            }
+        });
+    } catch {
+        console.warn('⚠️  Redis not available — real-time test sync via pub/sub is disabled.');
+    }
 
     // --- Socket.io Connection Handling ---
     io.on('connection', (socket) => {
