@@ -15,18 +15,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         console.log(`File received: ${file.name}, size: ${file.size}, type: ${file.type}`);
 
         const fileName = file.name.toLowerCase();
+        let fileType: 'docx' | 'md' | 'txt';
 
-        if (!fileName.endsWith('.docx') && !fileName.endsWith('.md')) {
-            return NextResponse.json({
-                error: 'Only DOCX and Markdown (.md) files are supported for direct upload.'
-            }, { status: 400 });
-        }
-
-        let fileType: 'docx' | 'md';
-        if (fileName.endsWith('.md')) {
-            fileType = 'md';
-        } else {
+        if (fileName.endsWith('.docx')) {
             fileType = 'docx';
+        } else if (fileName.endsWith('.md')) {
+            fileType = 'md';
+        } else if (fileName.endsWith('.txt')) {
+            fileType = 'txt';
+        } else {
+            return NextResponse.json({
+                error: 'Only DOCX, Markdown (.md), and TXT files are supported. Please use one of these formats.'
+            }, { status: 400 });
         }
 
         const buffer = Buffer.from(await file.arrayBuffer());

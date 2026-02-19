@@ -402,7 +402,8 @@ export default function UploadPage({ params }: { params: Promise<{ id: string }>
                             <div className="flex items-center gap-4">
                                 <Input
                                     type="file"
-                                    accept=".docx,.md"
+
+                                    accept=".docx,.md,.txt"
                                     onChange={e => setFile(e.target.files?.[0] || null)}
                                 />
                                 <Button onClick={handleUpload} disabled={!file || loading}>
