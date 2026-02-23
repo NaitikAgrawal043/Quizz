@@ -36,6 +36,9 @@ export default function TestPlayerPage({ params }: { params: Promise<{ id: strin
         if (isSubmitting) return;
         setIsSubmitting(true);
 
+        // Flush any pending debounced text-input saves
+        flushDebouncedSaves();
+
         // Stop camera
         stopCamera();
 
@@ -49,7 +52,7 @@ export default function TestPlayerPage({ params }: { params: Promise<{ id: strin
         }
 
         await fetch(`/api/attempts/${id}/submit`, { method: 'POST' });
-        router.push(`/test/${id}/result`);
+        router.push('/dashboard?submitted=true');
     }, [id, router, isSubmitting]);
 
     // Anti-cheat hook
@@ -261,7 +264,40 @@ export default function TestPlayerPage({ params }: { params: Promise<{ id: strin
         }
     }, [id]);
 
+    // Debounce timer ref for text inputs (integer / short)
+    const debounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+    const handleAnswerChange = (questionId: string, value: any, debounce = false) => {
+        setAnswers(prev => ({ ...prev, [questionId]: value }));
+
+        if (debounce) {
+            // Clear previous timer for this question
+            if (debounceRef.current[questionId]) {
+                clearTimeout(debounceRef.current[questionId]);
+            }
+            debounceRef.current[questionId] = setTimeout(() => {
+                saveAnswer(questionId, value);
+                delete debounceRef.current[questionId];
+            }, 800);
+        } else {
+            saveAnswer(questionId, value);
+        }
+    };
+
+    // Flush any pending debounced saves before unmount / submit
+    const flushDebouncedSaves = useCallback(() => {
+        Object.keys(debounceRef.current).forEach(qId => {
+            clearTimeout(debounceRef.current[qId]);
+            delete debounceRef.current[qId];
+        });
+    }, []);
+
     const handleClearAnswer = (questionId: string) => {
+        // Clear any pending debounce for this question
+        if (debounceRef.current[questionId]) {
+            clearTimeout(debounceRef.current[questionId]);
+            delete debounceRef.current[questionId];
+        }
         setAnswers(prev => {
             const newAnswers = { ...prev };
             delete newAnswers[questionId];
@@ -495,9 +531,9 @@ export default function TestPlayerPage({ params }: { params: Promise<{ id: strin
                                                 onChange={(e) => {
                                                     const value = e.target.value.replace(/\s+/g, '');
                                                     if (value === '') {
-                                                        handleAnswerChange(currentQ._id, null);
+                                                        handleAnswerChange(currentQ._id, null, true);
                                                     } else {
-                                                        handleAnswerChange(currentQ._id, value);
+                                                        handleAnswerChange(currentQ._id, value, true);
                                                     }
                                                 }}
                                                 className="max-w-xs"
@@ -528,7 +564,7 @@ export default function TestPlayerPage({ params }: { params: Promise<{ id: strin
                                                 value={answers[currentQ._id] || ''}
                                                 onChange={(e) => {
                                                     const value = e.target.value;
-                                                    handleAnswerChange(currentQ._id, value || null);
+                                                    handleAnswerChange(currentQ._id, value || null, true);
                                                 }}
                                                 className="max-w-md"
                                             />

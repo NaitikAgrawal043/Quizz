@@ -32,7 +32,9 @@ export async function parseDocument(buffer: Buffer, fileType: 'docx' | 'pdf' | '
             text = buffer.toString('utf-8');
             console.log('TXT read success, length:', text.length);
         } else if (fileType === 'pdf') {
-            throw new Error('PDF parsing is currently not supported. Please convert your PDF to DOCX format or use the text template.');
+            // PDF parsing via pdf-parse is disabled due to ReferenceError: DOMMatrix is not defined
+            // We now use Gemini's native PDF support in the API routes for better reliability
+            throw new Error('Please use the AI-assisted PDF parsing in the upload page.');
         }
     } catch (e) {
         console.error('Text extraction failed:', e);
