@@ -68,31 +68,4 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     );
   }
 }
-export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  await dbConnect();
 
-  try {
-    const { id } = await params;
-    const body = await req.json();
-
-    const updatedTest = await Test.findByIdAndUpdate(
-      id,
-      body,
-      { new: true }
-    ).lean();
-
-    if (!updatedTest) {
-      return NextResponse.json(
-        { error: 'Test not found' },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json(updatedTest);
-  } catch (error) {
-    return NextResponse.json(
-      { error: 'Failed to update test' },
-      { status: 500 }
-    );
-  }
-}
