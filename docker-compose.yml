@@ -1,17 +1,53 @@
-version: '3.8'
-
 services:
+  # ── Quiz App ──────────────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      - mongo
+      - redis
+    environment:
+      # Database – override in .env to use Atlas or external DB
+      MONGODB_URI: ${MONGODB_URI:-mongodb://mongo:27017/quizzapp}
+      # Redis (for BullMQ + Socket.io pub/sub)
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      # PDF Parse Worker Config
+      PDF_PARSE_QUEUE_ENABLED: "true"
+      PDF_PARSE_WORKER_CONCURRENCY: "2"
+      PDF_PARSE_WAIT_MS: "30000"
+      PDF_MAX_FILE_SIZE_MB: "20"
+      PDF_PARSE_MAX_CONCURRENT_PER_ADMIN: "3"
+      # NextAuth.js – generate a real secret with: openssl rand -base64 32
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-changeme}
+      NEXTAUTH_URL: http://localhost:3000
+      # Google Gemini AI
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      # Runtime
+      NODE_ENV: production
+      PORT: "3000"
+    restart: unless-stopped
+
+  # ── MongoDB ───────────────────────────────────────────────
   mongo:
-    image: mongo:latest
+    image: mongo:7
     ports:
       - "27017:27017"
     volumes:
       - mongo-data:/data/db
+    restart: unless-stopped
 
+  # ── Redis ─────────────────────────────────────────────────
   redis:
-    image: redis:alpine
+    image: redis:7-alpine
     ports:
       - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
 
 volumes:
   mongo-data:
+  redis-data:
