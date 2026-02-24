@@ -7,7 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Loader2, Bot, ChevronDown, ChevronUp, CheckCircle, XCircle, AlertCircle, FileText, ArrowLeft } from 'lucide-react';
-import Link from 'next/link';
 
 export default function ResultPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
