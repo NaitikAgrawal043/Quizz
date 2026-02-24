@@ -8,33 +8,63 @@ export async function GET() {
     await dbConnect();
     const session = await getServerSession(authOptions);
 
-    if (!session) {
+    if (!session || !session.user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     try {
-        // Build query based on user role
-        let testQuery = {};
-        if (session.user.role !== 'admin') {
-            testQuery = {
-                batches: { $in: session.user.batches },
-                status: 'published'
-            };
+        if (session.user.role === 'admin') {
+            // Admins see everything
+            const tests = await Test.find().sort({ createdAt: -1 }).lean();
+            const testIds = tests.map(t => t._id);
+            const attempts = await Attempt.find({
+                testId: { $in: testIds },
+                userId: session.user.id
+            }).lean();
+
+            const attemptMap = new Map();
+            attempts.forEach(attempt => {
+                attemptMap.set(attempt.testId.toString(), attempt);
+            });
+
+            const testsWithAttempts = tests.map(test => {
+                const attempt = attemptMap.get(test._id.toString());
+                return {
+                    _id: test._id, title: test.title, description: test.description,
+                    durationSeconds: test.durationSeconds, status: test.status,
+                    attempt: attempt ? { _id: attempt._id, status: attempt.status, score: attempt.score, submittedAt: attempt.submittedAt } : null
+                };
+            });
+
+            return NextResponse.json(testsWithAttempts);
         }
 
-        // Fetch tests
-        const tests = await Test.find(testQuery).sort({ createdAt: -1 }).lean();
+        // --- Student flow ---
 
-        // Fetch user's attempts for these tests
-        const testIds = tests.map(t => t._id);
-        const attempts = await Attempt.find({
-            testId: { $in: testIds },
-            userId: session.user.id
-        }).lean();
+        // 1. Published tests for the student's batches (new / available quizzes)
+        const publishedTests = await Test.find({
+            batches: { $in: session.user.batches },
+            status: 'published'
+        }).sort({ createdAt: -1 }).lean();
 
-        // Create a map of testId -> attempt
+        // 2. All attempts by this student
+        const allAttempts = await Attempt.find({ userId: session.user.id }).lean();
+
+        // 3. Find tests the student attempted that are no longer published (e.g. auto-drafted)
+        const publishedIds = new Set(publishedTests.map(t => t._id.toString()));
+        const extraTestIds = [...new Set(allAttempts.map(a => a.testId.toString()))]
+            .filter(id => !publishedIds.has(id));
+
+        const attemptedDraftTests = extraTestIds.length > 0
+            ? await Test.find({ _id: { $in: extraTestIds } }).sort({ createdAt: -1 }).lean()
+            : [];
+
+        // 4. Merge both lists
+        const tests = [...publishedTests, ...attemptedDraftTests];
+
+        // Build attempt map
         const attemptMap = new Map();
-        attempts.forEach(attempt => {
+        allAttempts.forEach(attempt => {
             attemptMap.set(attempt.testId.toString(), attempt);
         });
 

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/db/connect';
-import { TestSession, Question } from '@/lib/db/models';
+import { TestSession, Question, Test } from '@/lib/db/models';
 import { getRedisPublisher } from '@/lib/redis';
 
 export async function POST(req: Request, { params }: { params: Promise<{ testId: string }> }) {
@@ -45,6 +45,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ testId:
                 break;
             case 'FINISH':
                 session.status = 'finished';
+                // Auto-draft the test so it's no longer joinable by new students
+                await Test.findByIdAndUpdate(testId, { status: 'draft' });
                 break;
             default:
                 return NextResponse.json({ error: 'Invalid action' }, { status: 400 });

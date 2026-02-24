@@ -15,7 +15,7 @@ export interface ViolationData {
     }[];
 }
 
-const MAX_VIOLATIONS = 5;
+const MAX_VIOLATIONS = 15;
 
 /**
  * Get violation data for an attempt
