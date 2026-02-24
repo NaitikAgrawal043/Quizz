@@ -244,10 +244,7 @@ export default function TestPlayerPage({ params }: { params: Promise<{ id: strin
     }, [syncState, isLiveSession]);
 
 
-    const handleAnswerChange = (questionId: string, value: any) => {
-        setAnswers(prev => ({ ...prev, [questionId]: value }));
-        saveAnswer(questionId, value);
-    };
+
 
     const saveAnswer = useCallback(async (questionId: string, value: any) => {
         setSaving(true);
