@@ -28,12 +28,13 @@ export interface IQuestion extends Document {
   testId: mongoose.Types.ObjectId;
   sectionId?: string;
   type: 'mcq' | 'multi-mcq' | 'integer' | 'short';
-  stem: string; // HTML
+  stem: string; // Markdown
   options: IQuestionOption[];
   correctAnswer: any; // string | string[] | number
   marks: number;
   negativeMarks: number;
-  explanation?: string; // HTML
+  explanation?: string; // Markdown
+  images: { url: string; publicId: string }[]; // Cloudinary uploaded images
   needsManualReview: boolean;
   timeLimit?: number; // Time limit in seconds for this specific question
   createdAt: Date;
@@ -122,6 +123,10 @@ const QuestionSchema = new Schema<IQuestion>({
   marks: { type: Number, default: 1 },
   negativeMarks: { type: Number, default: 0 },
   explanation: { type: String },
+  images: [{
+    url: { type: String, required: true },
+    publicId: { type: String, required: true },
+  }],
   needsManualReview: { type: Boolean, default: false },
   timeLimit: { type: Number, default: 60 }, // Default 60 seconds per question
   createdAt: { type: Date, default: Date.now },

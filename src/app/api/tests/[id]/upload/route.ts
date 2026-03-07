@@ -14,15 +14,22 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
         console.log(`File received: ${file.name}, size: ${file.size}, type: ${file.type}`);
 
-        // Only support DOCX for now due to PDF parsing compatibility issues
-        if (!file.name.toLowerCase().endsWith('.docx')) {
+        const fileName = file.name.toLowerCase();
+
+        if (!fileName.endsWith('.docx') && !fileName.endsWith('.md')) {
             return NextResponse.json({
-                error: 'Only DOCX files are supported. Please convert your PDF to DOCX or copy the content into a Word document.'
+                error: 'Only DOCX and Markdown (.md) files are supported for direct upload.'
             }, { status: 400 });
         }
 
+        let fileType: 'docx' | 'md';
+        if (fileName.endsWith('.md')) {
+            fileType = 'md';
+        } else {
+            fileType = 'docx';
+        }
+
         const buffer = Buffer.from(await file.arrayBuffer());
-        const fileType = 'docx';
         console.log(`Processing as ${fileType}`);
 
         const result = await parseDocument(buffer, fileType);

@@ -1,5 +1,5 @@
 'use client';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
+import { MarkdownRenderer } from '@/components/ui/markdown-renderer';
+import { ImageUploadButton } from '@/components/ui/image-upload-button';
+import { Toaster } from '@/components/ui/toaster';
 
 interface ParsedQuestion {
     section: string;
@@ -24,6 +27,7 @@ interface ParsedQuestion {
     negativeMarks?: number;
     explanation?: string;
     timeLimit?: number;
+    images?: { url: string; publicId: string }[];
 }
 
 export default function UploadPage({ params }: { params: Promise<{ id: string }> }) {
@@ -41,6 +45,52 @@ export default function UploadPage({ params }: { params: Promise<{ id: string }>
     const [maxQuestions, setMaxQuestions] = useState(30);
     const [activeTab, setActiveTab] = useState('manual');
     const [numQuestions, setNumQuestions] = useState(5);
+
+    // Refs for textareas to track cursor position for image insertion
+    const stemRefs = useRef<Record<number, HTMLTextAreaElement | null>>({});
+    const explanationRefs = useRef<Record<number, HTMLTextAreaElement | null>>({});
+    const optionRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
+
+    /**
+     * Generic image upload handler — inserts cld:publicId at cursor position
+     * in any textarea field (stem, explanation, or option).
+     */
+    const handleFieldImageUpload = (
+        questionIndex: number,
+        imageData: { url: string; publicId: string },
+        textareaRef: HTMLTextAreaElement | null,
+        currentValue: string,
+        setValue: (newVal: string) => void
+    ) => {
+        const imageMarkdown = `![image](cld:${imageData.publicId})`;
+
+        // Track the image metadata on the question
+        const newQuestions = [...questions];
+        const currentImages = newQuestions[questionIndex].images || [];
+        newQuestions[questionIndex] = {
+            ...newQuestions[questionIndex],
+            images: [...currentImages, { url: imageData.publicId, publicId: imageData.publicId }],
+        };
+        setQuestions(newQuestions);
+
+        if (textareaRef) {
+            const cursorPos = textareaRef.selectionStart ?? currentValue.length;
+            const before = currentValue.slice(0, cursorPos);
+            const after = currentValue.slice(cursorPos);
+            const prefix = before.length > 0 && !before.endsWith('\n') ? '\n' : '';
+            const suffix = after.length > 0 && !after.startsWith('\n') ? '\n' : '';
+            const newValue = before + prefix + imageMarkdown + suffix + after;
+            setValue(newValue);
+
+            const newCursorPos = (before + prefix + imageMarkdown + suffix).length;
+            requestAnimationFrame(() => {
+                textareaRef.focus();
+                textareaRef.setSelectionRange(newCursorPos, newCursorPos);
+            });
+        } else {
+            setValue(currentValue + (currentValue.length > 0 ? '\n' : '') + imageMarkdown);
+        }
+    };
 
     const pollParseJob = async (jobId: string) => {
         const maxPolls = 90;
@@ -170,6 +220,25 @@ export default function UploadPage({ params }: { params: Promise<{ id: string }>
         }));
         setQuestions(newQuestions);
         setErrors([]);
+    };
+
+    const addQuestion = () => {
+        setQuestions(prev => [...prev, {
+            section: 'General',
+            type: 'mcq',
+            stem: '',
+            options: [
+                { id: 'a', text: '' },
+                { id: 'b', text: '' },
+                { id: 'c', text: '' },
+                { id: 'd', text: '' }
+            ],
+            correctAnswer: '',
+            marks: 1,
+            negativeMarks: 0,
+            explanation: '',
+            timeLimit: 60
+        }]);
     };
 
     const handleSave = async () => {
@@ -307,7 +376,7 @@ export default function UploadPage({ params }: { params: Promise<{ id: string }>
                 <TabsList className="grid w-full grid-cols-3">
                     <TabsTrigger value="manual">
                         <FileText className="mr-2 h-4 w-4" />
-                        Manual Upload (DOCX)
+                        Upload File (DOCX/MD)
                     </TabsTrigger>
                     <TabsTrigger value="book">
                         <BookOpen className="mr-2 h-4 w-4" />
@@ -322,13 +391,13 @@ export default function UploadPage({ params }: { params: Promise<{ id: string }>
                 <TabsContent value="manual">
                     <Card>
                         <CardHeader>
-                            <CardTitle>Upload Document (PDF or DOCX)</CardTitle>
+                            <CardTitle>Upload Document (DOCX or Markdown)</CardTitle>
                         </CardHeader>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-4">
                                 <Input
                                     type="file"
-                                    accept=".docx,.pdf"
+                                    accept=".docx,.md"
                                     onChange={e => setFile(e.target.files?.[0] || null)}
                                 />
                                 <Button onClick={handleUpload} disabled={!file || loading}>
@@ -343,8 +412,9 @@ export default function UploadPage({ params }: { params: Promise<{ id: string }>
                                 </a>
                             </div>
                             <p className="text-xs text-muted-foreground mt-2">
-                                For PDFs, we'll try to automatically detect questions and answers.
-                                For DOCX, please follow the standard template format.
+                                Supported: DOCX and Markdown (.md) files.
+                                For PDFs, use the "Upload Book PDF" tab.
+                                Follow the standard template format for best results.
                             </p>
                         </CardContent>
                     </Card>
@@ -448,10 +518,15 @@ export default function UploadPage({ params }: { params: Promise<{ id: string }>
                 <div className="space-y-4">
                     <div className="flex justify-between items-center">
                         <h2 className="text-xl font-semibold">Question Preview ({questions.length})</h2>
-                        <Button onClick={handleSave} disabled={saving}>
-                            {saving ? <Loader2 className="animate-spin mr-2" /> : <CheckCircle className="mr-2" />}
-                            Confirm & Save
-                        </Button>
+                        <div className="flex gap-2">
+                            <Button variant="outline" onClick={addQuestion}>
+                                <Plus className="mr-1 h-4 w-4" /> Add Question
+                            </Button>
+                            <Button onClick={handleSave} disabled={saving}>
+                                {saving ? <Loader2 className="animate-spin mr-2" /> : <CheckCircle className="mr-2" />}
+                                Confirm & Save
+                            </Button>
+                        </div>
                     </div>
 
                     <div className="grid gap-4">
@@ -486,11 +561,30 @@ export default function UploadPage({ params }: { params: Promise<{ id: string }>
                                     </CardHeader>
                                     <CardContent className="space-y-4">
                                         <div>
-                                            <Label>Stem</Label>
+                                            <div className="flex items-center justify-between mb-1">
+                                                <Label>Stem (Markdown supported)</Label>
+                                                <ImageUploadButton
+                                                    onUpload={(data) => handleFieldImageUpload(
+                                                        i, data,
+                                                        stemRefs.current[i],
+                                                        q.stem,
+                                                        (val) => updateQuestion(i, 'stem', val)
+                                                    )}
+                                                />
+                                            </div>
                                             <Textarea
+                                                ref={(el) => { stemRefs.current[i] = el; }}
                                                 value={q.stem}
                                                 onChange={e => updateQuestion(i, 'stem', e.target.value)}
+                                                rows={4}
+                                                placeholder="Write your question using Markdown... e.g. **bold**, *italic*, ![image](url)"
                                             />
+                                            {q.stem && (
+                                                <div className="mt-2 p-3 border rounded-md bg-muted/30">
+                                                    <p className="text-xs text-muted-foreground mb-1 font-medium">Preview</p>
+                                                    <MarkdownRenderer content={q.stem} />
+                                                </div>
+                                            )}
                                         </div>
 
                                         <div className="grid grid-cols-3 gap-4">
@@ -532,11 +626,30 @@ export default function UploadPage({ params }: { params: Promise<{ id: string }>
                                         </div>
 
                                         <div>
-                                            <Label>Explanation</Label>
+                                            <div className="flex items-center justify-between mb-1">
+                                                <Label>Explanation (Markdown supported)</Label>
+                                                <ImageUploadButton
+                                                    onUpload={(data) => handleFieldImageUpload(
+                                                        i, data,
+                                                        explanationRefs.current[i],
+                                                        q.explanation || '',
+                                                        (val) => updateQuestion(i, 'explanation', val)
+                                                    )}
+                                                />
+                                            </div>
                                             <Textarea
+                                                ref={(el) => { explanationRefs.current[i] = el; }}
                                                 value={q.explanation || ''}
                                                 onChange={e => updateQuestion(i, 'explanation', e.target.value)}
+                                                rows={3}
+                                                placeholder="Explain the answer using Markdown..."
                                             />
+                                            {q.explanation && (
+                                                <div className="mt-2 p-3 border rounded-md bg-muted/30">
+                                                    <p className="text-xs text-muted-foreground mb-1 font-medium">Preview</p>
+                                                    <MarkdownRenderer content={q.explanation} />
+                                                </div>
+                                            )}
                                         </div>
 
                                         {/* Options with inline correct answer selection */}
@@ -571,14 +684,31 @@ export default function UploadPage({ params }: { params: Promise<{ id: string }>
                                                                 }}
                                                             />
                                                         )}
-                                                        <span className="font-bold w-6">{opt.id.toUpperCase()})</span>
-                                                        <Input
-                                                            value={opt.text}
-                                                            onChange={e => {
-                                                                const newOpts = [...(q.options || [])];
-                                                                newOpts[j].text = e.target.value;
-                                                                updateQuestion(i, 'options', newOpts);
-                                                            }}
+                                                        <span className="font-bold w-6 pt-2">{opt.id.toUpperCase()})</span>
+                                                        <div className="flex-1 space-y-1">
+                                                            <Textarea
+                                                                ref={(el) => { optionRefs.current[`${i}-${j}`] = el; }}
+                                                                value={opt.text}
+                                                                onChange={e => {
+                                                                    const newOpts = [...(q.options || [])];
+                                                                    newOpts[j].text = e.target.value;
+                                                                    updateQuestion(i, 'options', newOpts);
+                                                                }}
+                                                                rows={2}
+                                                                placeholder="Option text (Markdown supported)"
+                                                            />
+                                                        </div>
+                                                        <ImageUploadButton
+                                                            onUpload={(data) => handleFieldImageUpload(
+                                                                i, data,
+                                                                optionRefs.current[`${i}-${j}`],
+                                                                opt.text,
+                                                                (val) => {
+                                                                    const newOpts = [...(q.options || [])];
+                                                                    newOpts[j].text = val;
+                                                                    updateQuestion(i, 'options', newOpts);
+                                                                }
+                                                            )}
                                                         />
                                                         <Button variant="ghost" size="icon" onClick={() => removeOption(i, j)}>
                                                             <Trash2 className="h-4 w-4 text-destructive" />
@@ -592,8 +722,14 @@ export default function UploadPage({ params }: { params: Promise<{ id: string }>
                             );
                         })}
                     </div>
+
+                    <Button variant="outline" onClick={addQuestion} className="w-full mt-2">
+                        <Plus className="mr-1 h-4 w-4" /> Add Another Question
+                    </Button>
                 </div>
             )}
+
+            <Toaster />
         </div>
     );
 }

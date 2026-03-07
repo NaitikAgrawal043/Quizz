@@ -12,6 +12,7 @@ import { Loader2, Clock, AlertTriangle, Shield, Camera, User, Users, Radio } fro
 import { useAntiCheat, ViolationType } from '@/hooks/useAntiCheat';
 import { useFaceDetection } from '@/hooks/useFaceDetection';
 import { WarningModal } from '@/components/ui/warning-modal';
+import { MarkdownRenderer } from '@/components/ui/markdown-renderer';
 import { useTestSocket } from '@/hooks/useTestSocket';
 
 export default function TestPlayerPage({ params }: { params: Promise<{ id: string }> }) {
@@ -435,7 +436,7 @@ export default function TestPlayerPage({ params }: { params: Promise<{ id: strin
 
                         <Card>
                             <CardContent className="pt-6 space-y-6">
-                                <div className="prose dark:prose-invert" dangerouslySetInnerHTML={{ __html: currentQ.stem }} />
+                                <MarkdownRenderer content={currentQ.stem} />
 
                                 {currentQ.type === 'mcq' && (
                                     <>
@@ -446,7 +447,7 @@ export default function TestPlayerPage({ params }: { params: Promise<{ id: strin
                                             {currentQ.options.map((opt: any) => (
                                                 <div key={opt.id} className="flex items-center space-x-2 border p-3 rounded-md hover:bg-accent cursor-pointer">
                                                     <RadioGroupItem value={opt.id} id={opt.id} />
-                                                    <Label htmlFor={opt.id} className="flex-1 cursor-pointer">{opt.text}</Label>
+                                                    <Label htmlFor={opt.id} className="flex-1 cursor-pointer"><MarkdownRenderer content={opt.text} /></Label>
                                                 </div>
                                             ))}
                                         </RadioGroup>
@@ -492,7 +493,7 @@ export default function TestPlayerPage({ params }: { params: Promise<{ id: strin
                                                             id={`multi-${currentQ._id}-${opt.id}`}
                                                         />
                                                         <Label htmlFor={`multi-${currentQ._id}-${opt.id}`} className="flex-1 cursor-pointer">
-                                                            {opt.text}
+                                                            <MarkdownRenderer content={opt.text} />
                                                         </Label>
                                                     </div>
                                                 );
