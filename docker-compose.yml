@@ -1,9 +1,7 @@
 services:
   # ── Quiz App ──────────────────────────────────────────────
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: sayshank/quizz:1.2
     ports:
       - "3000:3000"
     depends_on:

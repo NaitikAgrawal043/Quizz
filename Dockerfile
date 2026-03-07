@@ -1,45 +1,41 @@
-# ---- Base ----
 FROM node:20-alpine AS base
 WORKDIR /app
+ENV NEXT_TELEMETRY_DISABLED=1
 
-# ---- Dependencies ----
 FROM base AS deps
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci --ignore-scripts --no-audit --no-fund
 
-# ---- Builder ----
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-
-# Build-time env vars required by Next.js (public vars baked into client bundle)
-# Add any NEXT_PUBLIC_* vars here if needed in the future
-# ARG NEXT_PUBLIC_EXAMPLE
-# ENV NEXT_PUBLIC_EXAMPLE=$NEXT_PUBLIC_EXAMPLE
-
 RUN npm run build
+RUN npx tsc src/server.ts src/lib/redis.ts \
+    --outDir dist-server \
+    --rootDir src \
+    --module commonjs \
+    --target ES2020 \
+    --moduleResolution node \
+    --esModuleInterop \
+    --skipLibCheck
 
-# ---- Production ----
+FROM node:20-alpine AS runtime-deps
+WORKDIR /runtime
+RUN npm init -y && \
+    npm install socket.io@4.8.3 ioredis@5.8.2 --omit=dev --ignore-scripts --no-audit --no-fund
+
 FROM base AS runner
-
 ENV NODE_ENV=production
 ENV PORT=3000
-
-# Create a non-root user for security
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
-
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/src ./src
-COPY --from=builder /app/tsconfig.json ./tsconfig.json
-COPY --from=builder /app/next.config.ts ./next.config.ts
-
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/dist-server ./dist-server
+COPY --from=runtime-deps --chown=nextjs:nodejs /runtime/node_modules ./node_modules
 USER nextjs
-
 EXPOSE 3000
-
-# Use tsx to run the custom server (Socket.io + Next.js)
-CMD ["npx", "tsx", "src/server.ts"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:3000/ || exit 1
+CMD ["node", "dist-server/server.js"]

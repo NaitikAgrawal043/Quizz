@@ -1,3 +1,6 @@
+// Prevent static prerendering — all pages need auth/DB/Redis at runtime
+export const dynamic = 'force-dynamic';
+
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
