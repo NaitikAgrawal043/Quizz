@@ -28,7 +28,7 @@ export const worker = new Worker('grading-queue', async job => {
         console.log(`[grading-worker] Processing ${job.name} for attempt ${attemptId}`);
         await gradeAttempt(attemptId);
     }
-}, { connection, concurrency: gradingConcurrency });
+}, { connection: connection as any, concurrency: gradingConcurrency });
 
 worker.on('completed', job => {
     console.log(`[grading-worker] ${job.id} completed`);
@@ -75,7 +75,7 @@ export const pdfParseWorker = new Worker('pdf-parse-queue', async job => {
         sourceType,
         extractedCount: questions.length,
     };
-}, { connection, concurrency: parseWorkerConcurrency });
+}, { connection: connection as any, concurrency: parseWorkerConcurrency });
 
 pdfParseWorker.on('completed', job => {
     console.log(`[pdf-parse-worker] ${job.id} completed`);

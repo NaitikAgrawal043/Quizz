@@ -9,5 +9,5 @@ connection.on('error', (error) => {
     console.error('[redis] queue connection error:', error.message);
 });
 
-export const gradingQueue = new Queue('grading-queue', { connection });
-export const pdfParseQueue = new Queue('pdf-parse-queue', { connection });
+export const gradingQueue = new Queue('grading-queue', { connection: connection as any });
+export const pdfParseQueue = new Queue('pdf-parse-queue', { connection: connection as any });

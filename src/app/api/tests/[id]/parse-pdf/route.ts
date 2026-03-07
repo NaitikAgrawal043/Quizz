@@ -8,7 +8,7 @@ import IORedis from 'ioredis';
 const queueEvents = new QueueEvents('pdf-parse-queue', {
     connection: new IORedis(process.env.REDIS_URL || 'redis://localhost:6379', {
         maxRetriesPerRequest: null,
-    }),
+    }) as any,
 });
 
 function toPositiveInt(value: string | null, fallback: number): number {
