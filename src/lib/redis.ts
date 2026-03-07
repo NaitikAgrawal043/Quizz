@@ -15,7 +15,7 @@ export interface ViolationData {
     }[];
 }
 
-const MAX_VIOLATIONS = 15;
+const MAX_VIOLATIONS = parseInt(process.env.NEXT_PUBLIC_MAX_WARNINGS || '15', 10);
 
 /**
  * Get violation data for an attempt

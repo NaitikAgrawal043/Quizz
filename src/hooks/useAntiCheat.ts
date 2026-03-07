@@ -28,7 +28,7 @@ export function useAntiCheat({
 }: UseAntiCheatOptions): UseAntiCheatReturn {
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [violationCount, setViolationCount] = useState(0);
-    const [maxViolations, setMaxViolations] = useState(15);
+    const [maxViolations, setMaxViolations] = useState(parseInt(process.env.NEXT_PUBLIC_MAX_WARNINGS || '15', 10));
     const [showWarning, setShowWarning] = useState(false);
     const [lastViolationType, setLastViolationType] = useState<ViolationType | null>(null);
 
@@ -50,7 +50,7 @@ export function useAntiCheat({
             .then(data => {
                 if (isMounted.current && data.count !== undefined) {
                     setViolationCount(data.count);
-                    setMaxViolations(data.maxViolations || 15);
+                    setMaxViolations(data.maxViolations || parseInt(process.env.NEXT_PUBLIC_MAX_WARNINGS || '15', 10));
                 }
             })
             .catch(console.error);
@@ -79,7 +79,7 @@ export function useAntiCheat({
 
             if (isMounted.current) {
                 setViolationCount(data.count);
-                setMaxViolations(data.maxViolations || 15);
+                setMaxViolations(data.maxViolations || parseInt(process.env.NEXT_PUBLIC_MAX_WARNINGS || '15', 10));
 
                 if (data.shouldAutoSubmit) {
                     intentionalExit.current = true;
