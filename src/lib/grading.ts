@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { Attempt, Question } from '@/lib/db/models';
+import { Attempt, AttemptResult, Question } from '@/lib/db/models';
 import redis from '@/lib/redis';
 
 // ─── Answer-comparison helpers ───────────────────────────────────────
@@ -80,6 +80,42 @@ interface CachedQuestion {
     negativeMarks: number;
 }
 
+interface SnapshotQuestion {
+    _id: mongoose.Types.ObjectId;
+    stem: string;
+    options: Array<{ id: string; text: string; image?: string }>;
+    correctAnswer: unknown;
+    explanation?: string;
+    marks: number;
+    negativeMarks: number;
+}
+
+interface SnapshotAnswer {
+    questionId: mongoose.Types.ObjectId;
+    givenAnswer?: unknown;
+    isMarkedCorrect?: boolean;
+    awardedMarks?: number;
+}
+
+interface AttemptSnapshotSource {
+    _id: mongoose.Types.ObjectId;
+    testId: mongoose.Types.ObjectId;
+    userId: mongoose.Types.ObjectId;
+    answers: SnapshotAnswer[];
+    score?: number;
+    gradedAt?: Date;
+    resultVisibilityAt?: Date;
+}
+
+function isAnswerProvided(answer: unknown): boolean {
+    return (
+        answer !== null &&
+        answer !== undefined &&
+        answer !== '' &&
+        !(Array.isArray(answer) && answer.length === 0)
+    );
+}
+
 /**
  * Fetch question answer-keys for a test.
  *
@@ -128,6 +164,76 @@ async function getAnswerKey(testId: string): Promise<CachedQuestion[]> {
     }
 
     return answerKey;
+}
+
+export async function upsertAttemptResultSnapshot(source: AttemptSnapshotSource): Promise<void> {
+    const questions = await Question.find(
+        { testId: source.testId },
+        { _id: 1, stem: 1, options: 1, correctAnswer: 1, explanation: 1, marks: 1, negativeMarks: 1 },
+    ).lean<SnapshotQuestion[]>();
+
+    const orderedQuestions = [...questions].sort((a, b) => {
+        return a._id.toString().localeCompare(b._id.toString());
+    });
+
+    const answerMap = new Map<string, SnapshotAnswer>();
+    source.answers.forEach((answer) => {
+        answerMap.set(answer.questionId.toString(), answer);
+    });
+
+    const items = orderedQuestions.map((question) => {
+        const answer = answerMap.get(question._id.toString());
+        const wasAnswered = isAnswerProvided(answer?.givenAnswer);
+
+        return {
+            questionId: question._id,
+            stem: question.stem,
+            options: question.options || [],
+            correctAnswer: question.correctAnswer,
+            explanation: question.explanation,
+            marks: question.marks ?? 1,
+            negativeMarks: question.negativeMarks ?? 0,
+            userAnswer: answer?.givenAnswer ?? null,
+            isCorrect: answer ? !!answer.isMarkedCorrect : false,
+            isAttempted: wasAnswered,
+            awardedMarks: answer?.awardedMarks ?? 0,
+        };
+    });
+
+    const totalMarks = items.reduce((acc, item) => acc + item.marks, 0);
+    const correctCount = items.filter((item) => item.isCorrect).length;
+    const incorrectCount = items.filter((item) => item.isAttempted && !item.isCorrect).length;
+    const unattemptedCount = items.length - correctCount - incorrectCount;
+    const score = source.score ?? items.reduce((acc, item) => acc + item.awardedMarks, 0);
+    const gradedAt = source.gradedAt ?? new Date();
+    const resultVisibilityAt = source.resultVisibilityAt ?? gradedAt;
+
+    await AttemptResult.updateOne(
+        { attemptId: source._id },
+        {
+            $set: {
+                attemptId: source._id,
+                testId: source.testId,
+                userId: source.userId,
+                score,
+                totalMarks,
+                correctCount,
+                incorrectCount,
+                unattemptedCount,
+                gradedAt,
+                resultVisibilityAt,
+                schemaVersion: 1,
+                items,
+            },
+        },
+        { upsert: true },
+    );
+}
+
+export async function ensureAttemptResultSnapshot(attemptId: string): Promise<void> {
+    const attempt = await Attempt.findById(attemptId).lean();
+    if (!attempt) return;
+    await upsertAttemptResultSnapshot(attempt as unknown as AttemptSnapshotSource);
 }
 
 // ─── Main grading function ───────────────────────────────────────────
@@ -191,5 +297,6 @@ export async function gradeAttempt(attemptId: string): Promise<void> {
     attempt.resultVisibilityAt = new Date(); // Immediate for now
 
     await attempt.save();
+    await upsertAttemptResultSnapshot(attempt.toObject() as AttemptSnapshotSource);
     console.log(`[grading] Attempt ${attemptId} graded — score ${totalScore}`);
 }

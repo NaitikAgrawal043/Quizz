@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,9 +10,11 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Loader2 } from 'lucide-react';
 
 export default function SignupPage() {
     const router = useRouter();
+    const { data: session, status } = useSession();
     const [formData, setFormData] = useState({
         name: '',
         email: '',
@@ -24,11 +27,30 @@ export default function SignupPage() {
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
+        if (status === 'authenticated') {
+            router.replace(session?.user?.role === 'admin' ? '/admin' : '/dashboard');
+        }
+    }, [status, session, router]);
+
+    useEffect(() => {
+        if (status !== 'unauthenticated') return;
+
         fetch('/api/batches')
             .then(res => res.json())
             .then(setBatches)
             .catch(console.error);
-    }, []);
+    }, [status]);
+
+    if (status === 'loading') {
+        return <div className="flex justify-center flex-col items-center h-[50vh] gap-4">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-muted-foreground animate-pulse">Checking session...</p>
+        </div>;
+    }
+
+    if (status === 'authenticated') {
+        return null;
+    }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();

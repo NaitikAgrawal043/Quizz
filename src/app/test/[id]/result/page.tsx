@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Loader2, Bot, ChevronDown, ChevronUp, CheckCircle, XCircle, AlertCircle, FileText, ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Loader2, Bot, ChevronDown, ChevronUp, CheckCircle, XCircle, AlertCircle, FileText, ArrowLeft, ChevronLeft, ChevronRight, MinusCircle } from 'lucide-react';
 import { MarkdownRenderer } from '@/components/ui/markdown-renderer';
 
 export default function ResultPage({ params }: { params: Promise<{ id: string }> }) {
@@ -133,7 +133,8 @@ export default function ResultPage({ params }: { params: Promise<{ id: string }>
     const percentage = Math.round((data.score / data.totalMarks) * 100);
     const totalQuestions = data.results.length;
     const correctCount = data.results.filter((r: any) => r.isCorrect).length;
-    const incorrectCount = totalQuestions - correctCount;
+    const incorrectCount = data.results.filter((r: any) => r.isAttempted && !r.isCorrect).length;
+    const unattemptedCount = totalQuestions - correctCount - incorrectCount;
     const currentItem = data.results[currentIndex];
 
     const goTo = (idx: number) => {
@@ -166,6 +167,9 @@ export default function ResultPage({ params }: { params: Promise<{ id: string }>
                             <span className="flex items-center gap-1 text-red-500">
                                 <XCircle className="h-3.5 w-3.5" /> {incorrectCount}
                             </span>
+                            <span className="flex items-center gap-1 text-gray-500">
+                                <MinusCircle className="h-3.5 w-3.5" /> {unattemptedCount}
+                            </span>
                         </div>
                         <Badge variant={percentage >= 35 ? "default" : "destructive"} className="text-xs">
                             {percentage >= 35 ? "PASSED" : "NEEDS IMPROVEMENT"}
@@ -197,7 +201,9 @@ export default function ResultPage({ params }: { params: Promise<{ id: string }>
                                     }
                                     ${item.isCorrect
                                         ? 'bg-green-100 border-green-300 text-green-800 dark:bg-green-950 dark:border-green-800 dark:text-green-300'
-                                        : 'bg-red-100 border-red-300 text-red-800 dark:bg-red-950 dark:border-red-800 dark:text-red-300'
+                                        : item.isAttempted
+                                            ? 'bg-red-100 border-red-300 text-red-800 dark:bg-red-950 dark:border-red-800 dark:text-red-300'
+                                            : 'bg-gray-100 border-gray-300 text-gray-800 dark:bg-gray-900 dark:border-gray-800 dark:text-gray-400'
                                     }
                                 `}
                             >
@@ -214,6 +220,10 @@ export default function ResultPage({ params }: { params: Promise<{ id: string }>
                             <div className="w-3 h-3 rounded-sm bg-red-100 border border-red-300" />
                             Incorrect ({incorrectCount})
                         </div>
+                        <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-sm bg-gray-100 border border-gray-300" />
+                            Unattempted ({unattemptedCount})
+                        </div>
                     </div>
                 </div>
 
@@ -229,7 +239,9 @@ export default function ResultPage({ params }: { params: Promise<{ id: string }>
                                 ${i === currentIndex ? 'ring-2 ring-primary' : ''}
                                 ${item.isCorrect
                                     ? 'bg-green-100 border-green-300 text-green-800'
-                                    : 'bg-red-100 border-red-300 text-red-800'
+                                    : item.isAttempted
+                                        ? 'bg-red-100 border-red-300 text-red-800'
+                                        : 'bg-gray-100 border-gray-300 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
                                 }
                             `}
                         >
@@ -248,15 +260,15 @@ export default function ResultPage({ params }: { params: Promise<{ id: string }>
                                 <span className="text-sm text-muted-foreground">of {totalQuestions}</span>
                             </div>
                             <Badge
-                                variant={currentItem.isCorrect ? "outline" : "destructive"}
-                                className={`text-sm px-3 py-1 ${currentItem.isCorrect ? 'border-green-500 text-green-600 bg-green-50' : ''}`}
+                                variant={currentItem.isCorrect ? "outline" : currentItem.isAttempted ? "destructive" : "secondary"}
+                                className={`text-sm px-3 py-1 ${currentItem.isCorrect ? 'border-green-500 text-green-600 bg-green-50' : !currentItem.isAttempted ? 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300' : ''}`}
                             >
-                                {currentItem.isCorrect ? "✓ Correct" : "✗ Incorrect"}
+                                {currentItem.isCorrect ? "✓ Correct" : currentItem.isAttempted ? "✗ Incorrect" : "○ Unattempted"}
                             </Badge>
                         </div>
 
                         {/* Question Stem */}
-                        <div className={`p-5 rounded-lg border-l-4 mb-6 bg-card border ${currentItem.isCorrect ? 'border-l-green-500' : 'border-l-red-500'}`}>
+                        <div className={`p-5 rounded-lg border-l-4 mb-6 bg-card border ${currentItem.isCorrect ? 'border-l-green-500' : currentItem.isAttempted ? 'border-l-red-500' : 'border-l-gray-400'}`}>
                             <MarkdownRenderer content={currentItem.question.stem} className="text-base" />
                         </div>
 

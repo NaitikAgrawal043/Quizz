@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { signIn } from 'next-auth/react';
+import { useEffect, useState } from 'react';
+import { getSession, signIn, useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -9,13 +9,32 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Loader2 } from 'lucide-react';
 
 export default function LoginPage() {
     const router = useRouter();
+    const { data: session, status } = useSession();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (status === 'authenticated') {
+            router.replace(session?.user?.role === 'admin' ? '/admin' : '/dashboard');
+        }
+    }, [status, session, router]);
+
+    if (status === 'loading') {
+        return <div className="flex justify-center flex-col items-center h-[50vh] gap-4">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-muted-foreground animate-pulse">Checking session...</p>
+        </div>;
+    }
+
+    if (status === 'authenticated') {
+        return null;
+    }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -32,8 +51,9 @@ export default function LoginPage() {
             setError('Invalid email or password');
             setLoading(false);
         } else {
-            router.push('/dashboard');
-            router.refresh();
+            const currentSession = await getSession();
+            const targetPath = currentSession?.user?.role === 'admin' ? '/admin' : '/dashboard';
+            window.location.href = targetPath;
         }
     };
 

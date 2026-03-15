@@ -91,6 +91,37 @@ export interface ITestSession extends Document {
   updatedAt: Date;
 }
 
+export interface IAttemptResultItem {
+  questionId: mongoose.Types.ObjectId;
+  stem: string;
+  options: IQuestionOption[];
+  correctAnswer: unknown;
+  explanation?: string;
+  marks: number;
+  negativeMarks: number;
+  userAnswer: unknown;
+  isCorrect: boolean;
+  isAttempted: boolean;
+  awardedMarks: number;
+}
+
+export interface IAttemptResult extends Document {
+  attemptId: mongoose.Types.ObjectId;
+  testId: mongoose.Types.ObjectId;
+  userId: mongoose.Types.ObjectId;
+  score: number;
+  totalMarks: number;
+  correctCount: number;
+  incorrectCount: number;
+  unattemptedCount: number;
+  gradedAt: Date;
+  resultVisibilityAt: Date;
+  schemaVersion: number;
+  items: IAttemptResultItem[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 // --- Schemas ---
 
 const BatchSchema = new Schema<IBatch>({
@@ -179,6 +210,42 @@ const TestSessionSchema = new Schema<ITestSession>({
   updatedAt: { type: Date, default: Date.now },
 });
 
+const AttemptResultSchema = new Schema<IAttemptResult>({
+  attemptId: { type: Schema.Types.ObjectId, ref: 'Attempt', required: true, unique: true },
+  testId: { type: Schema.Types.ObjectId, ref: 'Test', required: true },
+  userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  score: { type: Number, required: true },
+  totalMarks: { type: Number, required: true },
+  correctCount: { type: Number, required: true },
+  incorrectCount: { type: Number, required: true },
+  unattemptedCount: { type: Number, required: true },
+  gradedAt: { type: Date, required: true },
+  resultVisibilityAt: { type: Date, required: true },
+  schemaVersion: { type: Number, default: 1 },
+  items: [{
+    questionId: { type: Schema.Types.ObjectId, ref: 'Question', required: true },
+    stem: { type: String, required: true },
+    options: [{
+      id: { type: String, required: true },
+      text: { type: String, required: true },
+      image: { type: String },
+    }],
+    correctAnswer: { type: Schema.Types.Mixed, required: true },
+    explanation: { type: String },
+    marks: { type: Number, required: true },
+    negativeMarks: { type: Number, required: true },
+    userAnswer: { type: Schema.Types.Mixed, default: null },
+    isCorrect: { type: Boolean, required: true },
+    isAttempted: { type: Boolean, required: true },
+    awardedMarks: { type: Number, required: true },
+  }],
+}, { timestamps: true });
+
+AttemptResultSchema.index({ attemptId: 1 }, { unique: true });
+AttemptResultSchema.index({ testId: 1, userId: 1 });
+AttemptResultSchema.index({ userId: 1, createdAt: -1 });
+AttemptResultSchema.index({ testId: 1, createdAt: -1 });
+
 // --- Models ---
 
 // Prevent overwriting models if they are already compiled (hot reload)
@@ -188,3 +255,4 @@ export const Test = mongoose.models.Test || mongoose.model<ITest>('Test', TestSc
 export const Question = mongoose.models.Question || mongoose.model<IQuestion>('Question', QuestionSchema);
 export const Attempt = mongoose.models.Attempt || mongoose.model<IAttempt>('Attempt', AttemptSchema);
 export const TestSession = mongoose.models.TestSession || mongoose.model<ITestSession>('TestSession', TestSessionSchema);
+export const AttemptResult = mongoose.models.AttemptResult || mongoose.model<IAttemptResult>('AttemptResult', AttemptResultSchema);
