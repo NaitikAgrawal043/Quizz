@@ -6,10 +6,8 @@ import { GraduationCap, ShieldCheck, ArrowRight } from "lucide-react";
 export default function Home() {
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4 sm:p-8 relative overflow-hidden">
-      {/* Subtle Grid Background */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none"></div>
       
-      {/* Top Gradient Fade */}
       <div className="absolute top-0 left-0 right-0 h-96 bg-gradient-to-b from-primary/5 to-transparent pointer-events-none"></div>
 
       <div className="relative z-10 flex flex-col items-center w-full max-w-5xl space-y-12 sm:space-y-16">
