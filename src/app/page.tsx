@@ -11,7 +11,7 @@ export default function Home() {
           Quiz Platform
         </h1>
         <p className="text-xl text-muted-foreground">
-          A secure, Quiz environment for students and professionals.
+          A secure, Quiz environment for students.
         </p>
       </div>
 
@@ -56,7 +56,7 @@ export default function Home() {
       </div>
 
       <footer className="text-sm text-muted-foreground mt-12">
-        &copy; 2025 Quiz Platform. All rights reserved.
+        &copy; {new Date().getFullYear()} Quiz Platform. All rights reserved.
       </footer>
     </div>
   );
