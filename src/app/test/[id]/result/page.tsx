@@ -253,18 +253,42 @@ export default function ResultPage({ params }: { params: Promise<{ id: string }>
                 {/* Question Detail View */}
                 <div className="flex-1 overflow-y-auto">
                     <div className="max-w-3xl mx-auto p-6">
-                        {/* Question Header */}
-                        <div className="flex items-center justify-between mb-6">
-                            <div className="flex items-center gap-3">
+                        {/* Question Header and Top Navigation */}
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
+                            <div className="flex items-center gap-3 w-full sm:w-auto">
                                 <span className="text-2xl font-bold text-muted-foreground">Q{currentIndex + 1}</span>
-                                <span className="text-sm text-muted-foreground">of {totalQuestions}</span>
+                                <Badge
+                                    variant={currentItem.isCorrect ? "outline" : currentItem.isAttempted ? "destructive" : "secondary"}
+                                    className={`text-sm px-3 py-1 ${currentItem.isCorrect ? 'border-green-500 text-green-600 bg-green-50' : !currentItem.isAttempted ? 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300' : ''}`}
+                                >
+                                    {currentItem.isCorrect ? "✓ Correct" : currentItem.isAttempted ? "✗ Incorrect" : "○ Unattempted"}
+                                </Badge>
                             </div>
-                            <Badge
-                                variant={currentItem.isCorrect ? "outline" : currentItem.isAttempted ? "destructive" : "secondary"}
-                                className={`text-sm px-3 py-1 ${currentItem.isCorrect ? 'border-green-500 text-green-600 bg-green-50' : !currentItem.isAttempted ? 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300' : ''}`}
-                            >
-                                {currentItem.isCorrect ? "✓ Correct" : currentItem.isAttempted ? "✗ Incorrect" : "○ Unattempted"}
-                            </Badge>
+
+                            {/* Top Navigation Controls */}
+                            <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end bg-muted/30 border rounded-lg p-1.5 shadow-sm">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => goTo(currentIndex - 1)}
+                                    disabled={currentIndex === 0}
+                                    className="gap-1.5 text-muted-foreground hover:text-foreground hover:bg-background"
+                                >
+                                    <ChevronLeft className="h-4 w-4" /> <span className="hidden sm:inline">Previous</span>
+                                </Button>
+                                <span className="text-sm text-muted-foreground font-medium px-3">
+                                    {currentIndex + 1} / {totalQuestions}
+                                </span>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => goTo(currentIndex + 1)}
+                                    disabled={currentIndex === totalQuestions - 1}
+                                    className="gap-1.5 text-muted-foreground hover:text-foreground hover:bg-background"
+                                >
+                                    <span className="hidden sm:inline">Next</span> <ChevronRight className="h-4 w-4" />
+                                </Button>
+                            </div>
                         </div>
 
                         {/* Question Stem */}
@@ -380,28 +404,7 @@ export default function ResultPage({ params }: { params: Promise<{ id: string }>
                             </div>
                         )}
 
-                        {/* Prev / Next Navigation */}
-                        <div className="flex items-center justify-between pt-4 border-t">
-                            <Button
-                                variant="outline"
-                                onClick={() => goTo(currentIndex - 1)}
-                                disabled={currentIndex === 0}
-                                className="gap-1.5"
-                            >
-                                <ChevronLeft className="h-4 w-4" /> Previous
-                            </Button>
-                            <span className="text-sm text-muted-foreground">
-                                {currentIndex + 1} / {totalQuestions}
-                            </span>
-                            <Button
-                                variant="outline"
-                                onClick={() => goTo(currentIndex + 1)}
-                                disabled={currentIndex === totalQuestions - 1}
-                                className="gap-1.5"
-                            >
-                                Next <ChevronRight className="h-4 w-4" />
-                            </Button>
-                        </div>
+                        {/* Bottom Navigation removed since it's moved to the top */}
                     </div>
                 </div>
             </div>
