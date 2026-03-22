@@ -108,7 +108,7 @@ export default function UploadPage({ params }: { params: Promise<{ id: string }>
                     marks: q.marks ?? 1,
                     negativeMarks: q.negativeMarks ?? 0
                 }));
-                setQuestions(sanitizedQuestions);
+                setQuestions(prev => [...prev, ...sanitizedQuestions]);
                 return;
             }
 
@@ -148,7 +148,7 @@ export default function UploadPage({ params }: { params: Promise<{ id: string }>
                     marks: q.marks ?? 1,
                     negativeMarks: q.negativeMarks ?? 0
                 }));
-                setQuestions(sanitizedQuestions);
+                setQuestions(prev => [...prev, ...sanitizedQuestions]);
                 setErrors(data.errors || []);
             } else if (res.status === 202 && data.jobId) {
                 await pollParseJob(String(data.jobId));
@@ -188,7 +188,7 @@ export default function UploadPage({ params }: { params: Promise<{ id: string }>
                     marks: q.marks ?? 1,
                     negativeMarks: q.negativeMarks ?? 0
                 }));
-                setQuestions(sanitizedQuestions);
+                setQuestions(prev => [...prev, ...sanitizedQuestions]);
             } else if (res.status === 202 && data.jobId) {
                 await pollParseJob(String(data.jobId));
             } else {
@@ -218,7 +218,7 @@ export default function UploadPage({ params }: { params: Promise<{ id: string }>
             explanation: '',
             timeLimit: 60
         }));
-        setQuestions(newQuestions);
+        setQuestions(prev => [...prev, ...newQuestions]);
         setErrors([]);
     };
 
@@ -366,6 +366,10 @@ export default function UploadPage({ params }: { params: Promise<{ id: string }>
         const newQuestions = [...questions];
         newQuestions[qIndex].options.splice(optIndex, 1);
         setQuestions(newQuestions);
+    };
+
+    const removeQuestion = (qIndex: number) => {
+        setQuestions(questions.filter((_, i) => i !== qIndex));
     };
 
     return (
@@ -557,6 +561,15 @@ export default function UploadPage({ params }: { params: Promise<{ id: string }>
                                                 value={q.section}
                                                 onChange={e => updateQuestion(i, 'section', e.target.value)}
                                             />
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="text-destructive hover:text-destructive shrink-0"
+                                                onClick={() => removeQuestion(i)}
+                                                title="Delete question"
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
                                         </div>
                                     </CardHeader>
                                     <CardContent className="space-y-4">
