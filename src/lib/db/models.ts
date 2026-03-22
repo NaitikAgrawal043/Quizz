@@ -210,6 +210,18 @@ const TestSessionSchema = new Schema<ITestSession>({
   updatedAt: { type: Date, default: Date.now },
 });
 
+// Index: question lookups by test (used in /api/attempts/[id]/play and grading)
+QuestionSchema.index({ testId: 1 });
+
+// Index: test lookups by batch + status (used in /api/tests/user-attempts)
+TestSchema.index({ batches: 1, status: 1 });
+
+// Indexes: attempt lookups (used across results, user-attempts, grading, violations)
+AttemptSchema.index({ userId: 1 });
+AttemptSchema.index({ testId: 1 });
+AttemptSchema.index({ testId: 1, status: 1 });
+AttemptSchema.index({ userId: 1, testId: 1 }, { unique: true, sparse: true });
+
 const AttemptResultSchema = new Schema<IAttemptResult>({
   attemptId: { type: Schema.Types.ObjectId, ref: 'Attempt', required: true, unique: true },
   testId: { type: Schema.Types.ObjectId, ref: 'Test', required: true },

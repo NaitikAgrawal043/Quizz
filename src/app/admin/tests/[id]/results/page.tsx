@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, use, useRef } from 'react';
+import { use } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
@@ -12,72 +12,28 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { useToast } from '@/components/ui/use-toast';
-import { ArrowLeft, Download, Printer, Users, Trophy, Clock } from 'lucide-react';
-
-interface Result {
-    _id: string;
-    user: {
-        name: string;
-        rollNumber?: number;
-    };
-    batch: string;
-    score: number;
-    submittedAt: string;
-}
+import { ArrowLeft, Download, Printer, Users, Trophy, Clock, Loader2 } from 'lucide-react';
+import { useTestResults } from '@/hooks/queries/useTestResults';
 
 export default function TestResultsPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
     const router = useRouter();
-    const { toast } = useToast();
-    const [results, setResults] = useState<Result[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [testTitle, setTestTitle] = useState('Test');
-    const tableRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-        const fetchResults = async () => {
-            try {
-                const res = await fetch(`/api/tests/${id}/results`);
-                if (!res.ok) throw new Error('Failed to fetch results');
-                const data = await res.json();
-                setResults(data);
-            } catch (error) {
-                console.error(error);
-                toast({
-                    title: 'Error',
-                    description: 'Failed to load test results',
-                    variant: 'destructive',
-                });
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchResults();
-    }, [id, toast]);
-
-    const handlePrint = () => {
-        window.print();
-    };
+    const { data: results = [], isLoading } = useTestResults(id);
 
     const handleDownloadCSV = () => {
         if (results.length === 0) return;
 
         const headers = ['Roll No', 'Name', 'Batch', 'Score', 'Submitted At'];
-        const rows = results.map(r => [
+        const rows = results.map((r) => [
             r.user.rollNumber || '-',
             r.user.name,
             r.batch,
             r.score,
-            new Date(r.submittedAt).toLocaleString()
+            new Date(r.submittedAt).toLocaleString(),
         ]);
 
-        const csvContent = [
-            headers.join(','),
-            ...rows.map(row => row.join(','))
-        ].join('\n');
-
+        const csvContent = [headers.join(','), ...rows.map((row) => row.join(','))].join('\n');
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
@@ -85,10 +41,11 @@ export default function TestResultsPage({ params }: { params: Promise<{ id: stri
         link.click();
     };
 
-    // Stats
     const totalAttempts = results.length;
-    const avgScore = totalAttempts > 0 ? (results.reduce((sum, r) => sum + r.score, 0) / totalAttempts).toFixed(1) : 0;
-    const highestScore = totalAttempts > 0 ? Math.max(...results.map(r => r.score)) : 0;
+    const avgScore = totalAttempts > 0
+        ? (results.reduce((sum, r) => sum + r.score, 0) / totalAttempts).toFixed(1)
+        : 0;
+    const highestScore = totalAttempts > 0 ? Math.max(...results.map((r) => r.score)) : 0;
 
     return (
         <div className="container mx-auto p-6 space-y-6 print:p-2">
@@ -110,14 +67,14 @@ export default function TestResultsPage({ params }: { params: Promise<{ id: stri
                         <Download className="mr-2 h-4 w-4" />
                         Export CSV
                     </Button>
-                    <Button variant="default" onClick={handlePrint} disabled={results.length === 0}>
+                    <Button variant="default" onClick={() => window.print()} disabled={results.length === 0}>
                         <Printer className="mr-2 h-4 w-4" />
                         Print / PDF
                     </Button>
                 </div>
             </div>
 
-            {/* Print Header (only visible when printing) */}
+            {/* Print Header */}
             <div className="hidden print:block text-center mb-4">
                 <h1 className="text-2xl font-bold">Test Results</h1>
                 <p className="text-sm text-gray-600">Generated on {new Date().toLocaleDateString()}</p>
@@ -159,14 +116,14 @@ export default function TestResultsPage({ params }: { params: Promise<{ id: stri
                 <CardHeader className="print:pb-2">
                     <CardTitle>Student Performance</CardTitle>
                     <CardDescription className="print:hidden">
-                        Sorted by Roll Number (ascending)
+                        Sorted by Roll Number (ascending) — auto-updates when new submissions arrive
                     </CardDescription>
                 </CardHeader>
-                <CardContent ref={tableRef}>
-                    {loading ? (
-                        <div className="text-center py-8">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                            <p className="mt-2 text-muted-foreground">Loading results...</p>
+                <CardContent>
+                    {isLoading ? (
+                        <div className="flex justify-center items-center py-8 gap-3">
+                            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                            <p className="text-muted-foreground">Loading results...</p>
                         </div>
                     ) : results.length === 0 ? (
                         <div className="text-center py-8 text-muted-foreground">
@@ -201,8 +158,7 @@ export default function TestResultsPage({ params }: { params: Promise<{ id: stri
                                                 </span>
                                             </TableCell>
                                             <TableCell className="text-center">
-                                                <span className={`font-semibold ${result.score >= highestScore ? 'text-green-600' : ''
-                                                    }`}>
+                                                <span className={`font-semibold ${result.score >= highestScore ? 'text-green-600' : ''}`}>
                                                     {result.score}
                                                 </span>
                                             </TableCell>
@@ -218,27 +174,13 @@ export default function TestResultsPage({ params }: { params: Promise<{ id: stri
                 </CardContent>
             </Card>
 
-            {/* Print Styles */}
             <style jsx global>{`
                 @media print {
-                    body * {
-                        visibility: hidden;
-                    }
-                    .container, .container * {
-                        visibility: visible;
-                    }
-                    .container {
-                        position: absolute;
-                        left: 0;
-                        top: 0;
-                        width: 100%;
-                    }
-                    .print\\:hidden {
-                        display: none !important;
-                    }
-                    .hidden.print\\:block {
-                        display: block !important;
-                    }
+                    body * { visibility: hidden; }
+                    .container, .container * { visibility: visible; }
+                    .container { position: absolute; left: 0; top: 0; width: 100%; }
+                    .print\\:hidden { display: none !important; }
+                    .hidden.print\\:block { display: block !important; }
                 }
             `}</style>
         </div>

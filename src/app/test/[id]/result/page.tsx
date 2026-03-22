@@ -1,50 +1,25 @@
 'use client';
 
-import { useEffect, useState, use } from 'react';
+import { useState, use } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Loader2, Bot, ChevronDown, ChevronUp, CheckCircle, XCircle, AlertCircle, FileText, ArrowLeft, ChevronLeft, ChevronRight, MinusCircle } from 'lucide-react';
 import { MarkdownRenderer } from '@/components/ui/markdown-renderer';
+import { useAttemptResult } from '@/hooks/queries/useAttemptResult';
+import { useAskAI } from '@/hooks/mutations/useAskAI';
 
 export default function ResultPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
-    const [data, setData] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
+
+    // Pure UI state — question navigation and AI panel state
     const [currentIndex, setCurrentIndex] = useState(0);
     const [aiExplanations, setAiExplanations] = useState<Record<number, string>>({});
-    const [aiLoading, setAiLoading] = useState<Record<number, boolean>>({});
     const [aiOpen, setAiOpen] = useState<Record<number, boolean>>({});
 
-    useEffect(() => {
-        let cancelled = false;
-        let timer: ReturnType<typeof setTimeout>;
-
-        const fetchResult = async () => {
-            try {
-                const res = await fetch(`/api/attempts/${id}/result`);
-                const json = await res.json();
-
-                if (cancelled) return;
-
-                if (res.status === 202) {
-                    setData({ grading: true, message: json.message });
-                    timer = setTimeout(fetchResult, 2000);
-                    return;
-                }
-
-                setData(json);
-                setLoading(false);
-            } catch (err) {
-                console.error('Failed to fetch results', err);
-                if (!cancelled) setLoading(false);
-            }
-        };
-
-        fetchResult();
-        return () => { cancelled = true; clearTimeout(timer); };
-    }, [id]);
+    const { data, isLoading } = useAttemptResult(id);
+    const askAI = useAskAI();
 
     const parseLatex = (text: string) => {
         if (!text) return '';
@@ -80,62 +55,65 @@ export default function ResultPage({ params }: { params: Promise<{ id: string }>
     };
 
     const handleAskAI = async (questionIndex: number, question: any) => {
-        setAiLoading(prev => ({ ...prev, [questionIndex]: true }));
-        setAiOpen(prev => ({ ...prev, [questionIndex]: true }));
-
-        try {
-            const response = await fetch('/api/ai/explain', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    question: question.stem,
-                    correctAnswer: question.correctAnswer,
-                    explanation: question.explanation
-                })
-            });
-
-            if (!response.ok) throw new Error('Failed to get AI explanation');
-
-            const result = await response.json();
-            const parsedExplanation = parseLatex(result.explanation || 'Unable to generate explanation');
-            setAiExplanations(prev => ({ ...prev, [questionIndex]: parsedExplanation }));
-            setAiLoading(prev => ({ ...prev, [questionIndex]: false }));
-        } catch (error) {
-            console.error('AI explanation error:', error);
-            setAiExplanations(prev => ({ ...prev, [questionIndex]: 'Failed to get AI explanation. Please try again.' }));
-            setAiLoading(prev => ({ ...prev, [questionIndex]: false }));
-        }
+        setAiOpen((prev) => ({ ...prev, [questionIndex]: true }));
+        askAI.mutate(
+            { question: question.stem, correctAnswer: question.correctAnswer, explanation: question.explanation },
+            {
+                onSuccess: (result) => {
+                    setAiExplanations((prev) => ({
+                        ...prev,
+                        [questionIndex]: parseLatex(result.explanation || 'Unable to generate explanation'),
+                    }));
+                },
+                onError: () => {
+                    setAiExplanations((prev) => ({
+                        ...prev,
+                        [questionIndex]: 'Failed to get AI explanation. Please try again.',
+                    }));
+                },
+            }
+        );
     };
 
-    if (loading) return <div className="flex justify-center flex-col items-center h-[50vh] gap-4">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="text-muted-foreground animate-pulse">Retrieving examination report...</p>
-    </div>;
+    // ── Loading / grading states ───────────────────────────────────
+    if (isLoading) {
+        return (
+            <div className="flex justify-center flex-col items-center h-[50vh] gap-4">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="text-muted-foreground animate-pulse">Retrieving examination report...</p>
+            </div>
+        );
+    }
 
-    if (data?.grading) return (
-        <div className="flex flex-col items-center justify-center p-20 gap-4 min-h-[50vh]">
-            <Loader2 className="h-10 w-10 animate-spin text-primary" />
-            <h2 className="text-xl font-semibold">Grading in Progress</h2>
-            <p className="text-muted-foreground text-center max-w-md">
-                Your submission has been received. {data.message || 'Calculating your score...'}
-            </p>
-        </div>
-    );
+    if (data?._httpStatus === 202 || data?.grading) {
+        return (
+            <div className="flex flex-col items-center justify-center p-20 gap-4 min-h-[50vh]">
+                <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                <h2 className="text-xl font-semibold">Grading in Progress</h2>
+                <p className="text-muted-foreground text-center max-w-md">
+                    Your submission has been received. {data.message || 'Calculating your score...'}
+                </p>
+            </div>
+        );
+    }
 
-    if (!data || data.message) return (
-        <div className="flex flex-col items-center justify-center p-20 gap-4 min-h-[50vh]">
-            <AlertCircle className="h-12 w-12 text-muted-foreground" />
-            <p className="text-lg font-medium">{data?.message || 'Report not available.'}</p>
-            <Link href="/dashboard"><Button variant="outline">Return to Dashboard</Button></Link>
-        </div>
-    );
+    if (!data || data.message) {
+        return (
+            <div className="flex flex-col items-center justify-center p-20 gap-4 min-h-[50vh]">
+                <AlertCircle className="h-12 w-12 text-muted-foreground" />
+                <p className="text-lg font-medium">{data?.message || 'Report not available.'}</p>
+                <Link href="/dashboard"><Button variant="outline">Return to Dashboard</Button></Link>
+            </div>
+        );
+    }
 
-    const percentage = Math.round((data.score / data.totalMarks) * 100);
-    const totalQuestions = data.results.length;
-    const correctCount = data.results.filter((r: any) => r.isCorrect).length;
-    const incorrectCount = data.results.filter((r: any) => r.isAttempted && !r.isCorrect).length;
+    // ── Derived values ─────────────────────────────────────────────
+    const percentage = Math.round((data.score! / data.totalMarks!) * 100);
+    const totalQuestions = data.results!.length;
+    const correctCount = data.results!.filter((r: any) => r.isCorrect).length;
+    const incorrectCount = data.results!.filter((r: any) => r.isAttempted && !r.isCorrect).length;
     const unattemptedCount = totalQuestions - correctCount - incorrectCount;
-    const currentItem = data.results[currentIndex];
+    const currentItem = data.results![currentIndex];
 
     const goTo = (idx: number) => {
         if (idx >= 0 && idx < totalQuestions) setCurrentIndex(idx);
@@ -150,7 +128,6 @@ export default function ResultPage({ params }: { params: Promise<{ id: string }>
                         <ArrowLeft className="h-4 w-4" /> Dashboard
                     </Link>
 
-                    {/* Compact Score Summary */}
                     <div className="flex items-center gap-4 text-sm">
                         <div className="flex items-center gap-1.5">
                             <span className="text-muted-foreground">Score:</span>
@@ -171,8 +148,8 @@ export default function ResultPage({ params }: { params: Promise<{ id: string }>
                                 <MinusCircle className="h-3.5 w-3.5" /> {unattemptedCount}
                             </span>
                         </div>
-                        <Badge variant={percentage >= 35 ? "default" : "destructive"} className="text-xs">
-                            {percentage >= 35 ? "PASSED" : "NEEDS IMPROVEMENT"}
+                        <Badge variant={percentage >= 35 ? 'default' : 'destructive'} className="text-xs">
+                            {percentage >= 35 ? 'PASSED' : 'NEEDS IMPROVEMENT'}
                         </Badge>
                     </div>
 
@@ -182,23 +159,19 @@ export default function ResultPage({ params }: { params: Promise<{ id: string }>
                 </div>
             </div>
 
-            {/* Main Content: Sidebar + Question View */}
             <div className="flex-1 flex overflow-hidden">
                 {/* Left Sidebar — Question Navigator */}
                 <div className="w-[220px] border-r bg-muted/20 p-4 overflow-y-auto shrink-0 hidden md:block">
                     <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Questions</h3>
                     <div className="grid grid-cols-5 gap-1.5">
-                        {data.results.map((item: any, i: number) => (
+                        {data.results!.map((item: any, i: number) => (
                             <button
                                 key={i}
                                 onClick={() => goTo(i)}
                                 className={`
                                     w-full aspect-square rounded-md text-xs font-medium flex items-center justify-center
                                     transition-all border cursor-pointer
-                                    ${i === currentIndex
-                                        ? 'ring-2 ring-primary ring-offset-1 scale-110 z-10'
-                                        : 'hover:scale-105'
-                                    }
+                                    ${i === currentIndex ? 'ring-2 ring-primary ring-offset-1 scale-110 z-10' : 'hover:scale-105'}
                                     ${item.isCorrect
                                         ? 'bg-green-100 border-green-300 text-green-800 dark:bg-green-950 dark:border-green-800 dark:text-green-300'
                                         : item.isAttempted
@@ -227,9 +200,9 @@ export default function ResultPage({ params }: { params: Promise<{ id: string }>
                     </div>
                 </div>
 
-                {/* Mobile Question Selector (horizontal scroll) */}
+                {/* Mobile Question Selector */}
                 <div className="md:hidden border-b bg-muted/20 p-2 overflow-x-auto flex gap-1.5 shrink-0">
-                    {data.results.map((item: any, i: number) => (
+                    {data.results!.map((item: any, i: number) => (
                         <button
                             key={i}
                             onClick={() => goTo(i)}
@@ -253,19 +226,18 @@ export default function ResultPage({ params }: { params: Promise<{ id: string }>
                 {/* Question Detail View */}
                 <div className="flex-1 overflow-y-auto">
                     <div className="max-w-3xl mx-auto p-6">
-                        {/* Question Header and Top Navigation */}
+                        {/* Question Header and Navigation */}
                         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
                             <div className="flex items-center gap-3 w-full sm:w-auto">
                                 <span className="text-2xl font-bold text-muted-foreground">Q{currentIndex + 1}</span>
                                 <Badge
-                                    variant={currentItem.isCorrect ? "outline" : currentItem.isAttempted ? "destructive" : "secondary"}
+                                    variant={currentItem.isCorrect ? 'outline' : currentItem.isAttempted ? 'destructive' : 'secondary'}
                                     className={`text-sm px-3 py-1 ${currentItem.isCorrect ? 'border-green-500 text-green-600 bg-green-50' : !currentItem.isAttempted ? 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300' : ''}`}
                                 >
-                                    {currentItem.isCorrect ? "✓ Correct" : currentItem.isAttempted ? "✗ Incorrect" : "○ Unattempted"}
+                                    {currentItem.isCorrect ? '✓ Correct' : currentItem.isAttempted ? '✗ Incorrect' : '○ Unattempted'}
                                 </Badge>
                             </div>
 
-                            {/* Top Navigation Controls */}
                             <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end bg-muted/30 border rounded-lg p-1.5 shadow-sm">
                                 <Button
                                     variant="ghost"
@@ -296,7 +268,7 @@ export default function ResultPage({ params }: { params: Promise<{ id: string }>
                             <MarkdownRenderer content={currentItem.question.stem} className="text-base" />
                         </div>
 
-                        {/* Options (if MCQ) */}
+                        {/* MCQ Options */}
                         {currentItem.question.options && currentItem.question.options.length > 0 && (
                             <div className="space-y-2 mb-6">
                                 <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Options</h4>
@@ -331,7 +303,7 @@ export default function ResultPage({ params }: { params: Promise<{ id: string }>
                             </div>
                         )}
 
-                        {/* Short/Integer Answer Display */}
+                        {/* Short / Integer Answer */}
                         {(!currentItem.question.options || currentItem.question.options.length === 0) && (
                             <div className="grid grid-cols-2 gap-4 mb-6">
                                 <div className="space-y-1">
@@ -351,7 +323,7 @@ export default function ResultPage({ params }: { params: Promise<{ id: string }>
                             </div>
                         )}
 
-                        {/* Explanation Section */}
+                        {/* Explanation + AI */}
                         {(currentItem.question.explanation || aiOpen[currentIndex]) && (
                             <div className="pt-4 border-t space-y-4 mb-6">
                                 {currentItem.question.explanation && (
@@ -361,7 +333,6 @@ export default function ResultPage({ params }: { params: Promise<{ id: string }>
                                     </div>
                                 )}
 
-                                {/* AI Explain Button */}
                                 {!aiExplanations[currentIndex] && !currentItem.isCorrect && (
                                     <div className="flex">
                                         <Button
@@ -369,9 +340,9 @@ export default function ResultPage({ params }: { params: Promise<{ id: string }>
                                             size="sm"
                                             className="gap-2 text-xs"
                                             onClick={() => handleAskAI(currentIndex, currentItem.question)}
-                                            disabled={aiLoading[currentIndex]}
+                                            disabled={askAI.isPending}
                                         >
-                                            {aiLoading[currentIndex] ? (
+                                            {askAI.isPending ? (
                                                 <><Loader2 className="h-3 w-3 animate-spin" /> Analyzing...</>
                                             ) : (
                                                 <><Bot className="h-3 w-3" /> Explain why I&apos;m wrong</>
@@ -383,7 +354,7 @@ export default function ResultPage({ params }: { params: Promise<{ id: string }>
                                 {aiExplanations[currentIndex] && (
                                     <Collapsible
                                         open={aiOpen[currentIndex]}
-                                        onOpenChange={(open) => setAiOpen(prev => ({ ...prev, [currentIndex]: open }))}
+                                        onOpenChange={(open) => setAiOpen((prev) => ({ ...prev, [currentIndex]: open }))}
                                         className="bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900 rounded-md"
                                     >
                                         <CollapsibleTrigger asChild>
@@ -403,8 +374,6 @@ export default function ResultPage({ params }: { params: Promise<{ id: string }>
                                 )}
                             </div>
                         )}
-
-                        {/* Bottom Navigation removed since it's moved to the top */}
                     </div>
                 </div>
             </div>

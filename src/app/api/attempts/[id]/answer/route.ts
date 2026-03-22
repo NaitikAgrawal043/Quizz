@@ -7,49 +7,51 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     try {
         const { questionId, givenAnswer } = await req.json();
         const { id } = await params;
-        const attemptId = id;
 
-        // Fetch attempt to validate
-        const attempt = await Attempt.findById(attemptId);
-
-        if (!attempt) {
-            return NextResponse.json({ error: 'Attempt not found' }, { status: 404 });
-        }
-
-        // Prevent saving if test is expired
-        if (new Date() > new Date(attempt.expiresAt)) {
-            return NextResponse.json({ error: 'Test has expired' }, { status: 400 });
-        }
-
-        // Prevent saving if test is already submitted
-        if (attempt.status !== 'in_progress') {
-            return NextResponse.json({ error: 'Test has been submitted' }, { status: 400 });
-        }
-
-        await Attempt.updateOne(
-            { _id: attemptId, 'answers.questionId': questionId },
+        // Try to update an existing answer for this question.
+        // Validation (status + expiry) is embedded in the filter — no separate findById needed.
+        const updated = await Attempt.updateOne(
+            {
+                _id: id,
+                status: 'in_progress',
+                expiresAt: { $gt: new Date() },
+                'answers.questionId': questionId,
+            },
             {
                 $set: {
                     'answers.$.givenAnswer': givenAnswer,
-                    'answers.$.savedAt': new Date()
-                }
+                    'answers.$.savedAt': new Date(),
+                },
             }
         );
 
-        // If answer doesn't exist yet, push it
-        const answerExists = attempt.answers.some((a: any) => a.questionId.toString() === questionId);
-
-        if (!answerExists) {
-            await Attempt.findByIdAndUpdate(attemptId, {
-                $push: {
-                    answers: {
-                        questionId,
-                        givenAnswer,
-                        savedAt: new Date(),
-                        autoScored: true
-                    }
+        if (updated.matchedCount === 0) {
+            // Answer doesn't exist yet for this question — push a new one.
+            // Filter still validates status + expiry so invalid attempts are rejected.
+            const pushed = await Attempt.updateOne(
+                {
+                    _id: id,
+                    status: 'in_progress',
+                    expiresAt: { $gt: new Date() },
+                },
+                {
+                    $push: {
+                        answers: {
+                            questionId,
+                            givenAnswer,
+                            savedAt: new Date(),
+                            autoScored: true,
+                        },
+                    },
                 }
-            });
+            );
+
+            if (pushed.matchedCount === 0) {
+                return NextResponse.json(
+                    { error: 'Attempt not found, expired, or already submitted' },
+                    { status: 400 }
+                );
+            }
         }
 
         return NextResponse.json({ success: true });

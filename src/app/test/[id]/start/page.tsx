@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +12,8 @@ import {
     Camera, ArrowRight, Loader2
 } from 'lucide-react';
 import { FaceVerification } from '@/components/ui/face-verification';
+import { useTest } from '@/hooks/queries/useTest';
+import { useStartTest } from '@/hooks/mutations/useStartTest';
 
 // Step types for the multi-step flow
 type Step = 'rules' | 'camera' | 'verified';
@@ -19,31 +21,18 @@ type Step = 'rules' | 'camera' | 'verified';
 export default function StartTestPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
     const router = useRouter();
-    const [test, setTest] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
     const [acknowledged, setAcknowledged] = useState(false);
-    const [starting, setStarting] = useState(false);
     const [currentStep, setCurrentStep] = useState<Step>('rules');
 
-    useEffect(() => {
-        fetch(`/api/tests/${id}`)
-            .then(res => res.json())
-            .then(setTest)
-            .catch(console.error)
-            .finally(() => setLoading(false));
-    }, [id]);
+    const { data: test, isLoading } = useTest(id);
+    const startTest = useStartTest(id);
 
     const handleStartTest = async () => {
-        setStarting(true);
         try {
-            const res = await fetch(`/api/tests/${id}/start`, { method: 'POST' });
-            if (res.ok) {
-                const attempt = await res.json();
-                router.push(`/test/${attempt._id}`);
-            }
+            const attempt = await startTest.mutateAsync();
+            router.push(`/test/${attempt._id}`);
         } catch (error) {
             console.error('Failed to start test:', error);
-            setStarting(false);
         }
     };
 
@@ -59,7 +48,7 @@ export default function StartTestPage({ params }: { params: Promise<{ id: string
         setCurrentStep('rules');
     };
 
-    if (loading) return <div className="flex justify-center items-center h-screen"><Loader2 className="animate-spin h-8 w-8" /></div>;
+    if (isLoading) return <div className="flex justify-center items-center h-screen"><Loader2 className="animate-spin h-8 w-8" /></div>;
     if (!test) return <div className="flex justify-center items-center h-screen">Test not found</div>;
 
     // Rules for the test
@@ -292,9 +281,9 @@ export default function StartTestPage({ params }: { params: Promise<{ id: string
                                     size="lg"
                                     className="flex-1 h-14 text-lg font-semibold bg-green-500 hover:bg-green-600"
                                     onClick={handleStartTest}
-                                    disabled={starting}
+                                    disabled={startTest.isPending}
                                 >
-                                    {starting ? (
+                                    {startTest.isPending ? (
                                         <>
                                             <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                                             Starting...
