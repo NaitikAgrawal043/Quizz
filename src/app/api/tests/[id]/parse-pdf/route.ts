@@ -82,9 +82,12 @@ export async function POST(req: Request, _context: { params: Promise<{ id: strin
             }, { status: 202 });
         }
 
-    } catch (error) {
+    } catch (error: any) {
         console.error('PDF Parse API Error:', error);
-        return NextResponse.json({ error: 'Failed to process PDF' }, { status: 500 });
+        return NextResponse.json({
+            error: 'Failed to process PDF',
+            details: error.message || String(error)
+        }, { status: 500 });
     }
 }
 

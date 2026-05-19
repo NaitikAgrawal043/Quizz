@@ -23,7 +23,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         const base64Data = buffer.toString('base64');
 
         // Use gemini-1.5-flash for reliable PDF parsing
-        // gemini-2.5-flash has issues with responseMimeType causing empty responses
+        // gemini-1.5-flash has issues with responseMimeType causing empty responses
         const model = genAI.getGenerativeModel({
             model: 'gemini-2.5-flash',
             generationConfig: {

@@ -2,6 +2,7 @@
 
 import { use } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import {
     Table,
@@ -12,7 +13,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ArrowLeft, Download, Printer, Users, Trophy, Clock, Loader2 } from 'lucide-react';
+import { ArrowLeft, Download, Printer, Users, Trophy, Clock, Loader2, FileText } from 'lucide-react';
 import { useTestResults } from '@/hooks/queries/useTestResults';
 
 export default function TestResultsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -52,7 +53,7 @@ export default function TestResultsPage({ params }: { params: Promise<{ id: stri
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 print:hidden">
                 <div className="flex items-center gap-4">
-                    <Button variant="ghost" size="icon" onClick={() => router.back()}>
+                    <Button variant="ghost" size="icon" onClick={() => router.push('/admin')}>
                         <ArrowLeft className="h-5 w-5" />
                     </Button>
                     <div>
@@ -140,6 +141,7 @@ export default function TestResultsPage({ params }: { params: Promise<{ id: stri
                                         <TableHead className="font-semibold">Batch</TableHead>
                                         <TableHead className="font-semibold text-center">Score</TableHead>
                                         <TableHead className="font-semibold print:hidden">Submitted</TableHead>
+                                        <TableHead className="font-semibold print:hidden text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -164,6 +166,14 @@ export default function TestResultsPage({ params }: { params: Promise<{ id: stri
                                             </TableCell>
                                             <TableCell className="text-muted-foreground print:hidden">
                                                 {new Date(result.submittedAt).toLocaleString()}
+                                            </TableCell>
+                                            <TableCell className="text-right print:hidden">
+                                                <Button variant="ghost" size="sm" asChild>
+                                                    <Link href={`/admin/tests/${id}/results/${result._id}`}>
+                                                        <FileText className="h-4 w-4 mr-2" />
+                                                        View Details
+                                                    </Link>
+                                                </Button>
                                             </TableCell>
                                         </TableRow>
                                     ))}

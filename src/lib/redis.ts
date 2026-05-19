@@ -1,6 +1,6 @@
 import IORedis from 'ioredis';
 
-const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+const REDIS_URL = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
 const MAX_RETRIES = 3;
 
 let redisAvailable: boolean | null = null; // null = unknown yet
@@ -140,7 +140,7 @@ export function getRedisPublisher(): IORedis {
     if (!redisPub) {
         redisPub = new IORedis(REDIS_URL, {
             maxRetriesPerRequest: null,
-            lazyConnect: true,
+            lazyConnect: false,
             retryStrategy,
         });
         redisPub.on('error', () => { /* handled by retryStrategy */ });
@@ -156,7 +156,7 @@ export function getRedisSubscriber(): IORedis {
     if (!redisSub) {
         redisSub = new IORedis(REDIS_URL, {
             maxRetriesPerRequest: null,
-            lazyConnect: true,
+            lazyConnect: false,
             retryStrategy,
         });
         redisSub.on('error', () => { /* handled by retryStrategy */ });

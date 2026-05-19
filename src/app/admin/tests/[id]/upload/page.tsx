@@ -153,7 +153,7 @@ export default function UploadPage({ params }: { params: Promise<{ id: string }>
             } else if (res.status === 202 && data.jobId) {
                 await pollParseJob(String(data.jobId));
             } else {
-                setErrors([data.error || 'Failed to parse file']);
+                setErrors([data.error || 'Failed to parse file', data.details].filter(Boolean));
             }
         } catch (err) {
             setErrors(['Upload failed']);
@@ -192,7 +192,7 @@ export default function UploadPage({ params }: { params: Promise<{ id: string }>
             } else if (res.status === 202 && data.jobId) {
                 await pollParseJob(String(data.jobId));
             } else {
-                setErrors([data.error || 'Failed to extract questions from book PDF']);
+                setErrors([data.error || 'Failed to extract questions from book PDF', data.details].filter(Boolean));
             }
         } catch (err) {
             setErrors(['Book extraction failed']);
