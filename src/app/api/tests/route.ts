@@ -23,7 +23,7 @@ export async function GET() {
             };
         }
 
-        const tests = await Test.find(query).sort({ createdAt: -1 }).lean();
+        const tests = await Test.find(query).populate('batches', 'name').sort({ createdAt: -1 }).lean();
         return NextResponse.json(tests);
     } catch (error) {
         return NextResponse.json({ error: 'Failed to fetch tests' }, { status: 500 });

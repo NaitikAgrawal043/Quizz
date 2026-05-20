@@ -23,6 +23,7 @@ export default function CreateTestPage() {
         durationSeconds: 3600,
         selectedBatches: [] as string[],
         status: 'draft' as 'draft' | 'published',
+        testDate: '',
     });
 
     useEffect(() => {
@@ -43,6 +44,7 @@ export default function CreateTestPage() {
                 durationSeconds: formData.durationSeconds,
                 batches: formData.selectedBatches, // Rename to match database field
                 status: formData.status,
+                testDate: formData.testDate ? new Date(formData.testDate).toISOString() : undefined,
                 sections: [], // Initial empty sections
             }),
         });
@@ -87,6 +89,17 @@ export default function CreateTestPage() {
                                 type="number"
                                 value={formData.durationSeconds}
                                 onChange={e => setFormData({ ...formData, durationSeconds: parseInt(e.target.value) })}
+                                required
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="testDate">Test Scheduled/Conducted Date</Label>
+                            <Input
+                                id="testDate"
+                                type="datetime-local"
+                                value={formData.testDate}
+                                onChange={e => setFormData({ ...formData, testDate: e.target.value })}
                                 required
                             />
                         </div>

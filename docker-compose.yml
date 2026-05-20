@@ -30,7 +30,7 @@ services:
 
   # ── MongoDB ───────────────────────────────────────────────
   mongo:
-    image: mongo:7
+    image: mongo:5
     ports:
       - "27017:27017"
     volumes:

@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 interface UpdateTestVars {
     title: string;
     status: string;
+    testDate?: string;
 }
 
 export function useUpdateTest(testId: string) {

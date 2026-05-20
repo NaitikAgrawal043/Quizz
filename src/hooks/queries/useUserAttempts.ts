@@ -5,6 +5,8 @@ export interface UserTest {
     title: string;
     durationSeconds: number;
     status: string;
+    testDate?: string;
+    batches?: Array<string | { _id: string; name: string }>;
     attempt: {
         _id: string;
         status: 'in_progress' | 'submitted' | 'graded' | 'grading';

@@ -4,11 +4,30 @@ import { authOptions } from '@/lib/auth';
 import dbConnect from '@/lib/db/connect';
 import { Attempt, AttemptResult } from '@/lib/db/models';
 import { ensureAttemptResultSnapshot, gradeAttempt } from '@/lib/grading';
+
+const STUCK_GRADING_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+
+interface SnapshotItem {
+    stem: string;
+    options: Array<{ id: string; text: string; image?: string }>;
+    correctAnswer: unknown;
+    explanation?: string;
+    marks: number;
+    userAnswer: unknown;
+    isCorrect: boolean;
+    isAttempted: boolean;
+    awardedMarks: number;
+}
+
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+    await dbConnect();
+    try {
+        const session = await getServerSession(authOptions);
         if (!session?.user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const isAdmin = session?.user?.role === 'admin';
+        const isAdmin = session.user.role === 'admin';
         const { id } = await params;
         const attemptId = id;
         let attempt = await Attempt.findById(attemptId).lean();
@@ -17,7 +36,6 @@ import { ensureAttemptResultSnapshot, gradeAttempt } from '@/lib/grading';
             return NextResponse.json({ error: 'Attempt not found' }, { status: 404 });
         }
 
-        const isAdmin = session.user.role === 'admin';
         const isOwner = attempt.userId.toString() === session.user.id;
 
         if (!isAdmin && !isOwner) {

@@ -15,7 +15,7 @@ export async function GET() {
     try {
         if (session.user.role === 'admin') {
             // Admins see everything
-            const tests = await Test.find().sort({ createdAt: -1 }).lean();
+            const tests = await Test.find().populate('batches', 'name').sort({ createdAt: -1 }).lean();
             const testIds = tests.map(t => t._id);
             const attempts = await Attempt.find({
                 testId: { $in: testIds },
@@ -30,8 +30,13 @@ export async function GET() {
             const testsWithAttempts = tests.map(test => {
                 const attempt = attemptMap.get(test._id.toString());
                 return {
-                    _id: test._id, title: test.title, description: test.description,
-                    durationSeconds: test.durationSeconds, status: test.status,
+                    _id: test._id,
+                    title: test.title,
+                    description: test.description,
+                    durationSeconds: test.durationSeconds,
+                    status: test.status,
+                    batches: test.batches,
+                    testDate: test.testDate,
                     attempt: attempt ? { _id: attempt._id, status: attempt.status, score: attempt.score, submittedAt: attempt.submittedAt } : null
                 };
             });
@@ -45,7 +50,7 @@ export async function GET() {
         const publishedTests = await Test.find({
             batches: { $in: session.user.batches },
             status: 'published'
-        }).sort({ createdAt: -1 }).lean();
+        }).populate('batches', 'name').sort({ createdAt: -1 }).lean();
 
         // 2. All attempts by this student
         const allAttempts = await Attempt.find({ userId: session.user.id }).lean();
@@ -56,7 +61,7 @@ export async function GET() {
             .filter(id => !publishedIds.has(id));
 
         const attemptedDraftTests = extraTestIds.length > 0
-            ? await Test.find({ _id: { $in: extraTestIds } }).sort({ createdAt: -1 }).lean()
+            ? await Test.find({ _id: { $in: extraTestIds } }).populate('batches', 'name').sort({ createdAt: -1 }).lean()
             : [];
 
         // 4. Merge both lists
@@ -77,6 +82,8 @@ export async function GET() {
                 description: test.description,
                 durationSeconds: test.durationSeconds,
                 status: test.status,
+                batches: test.batches,
+                testDate: test.testDate,
                 attempt: attempt ? {
                     _id: attempt._id,
                     status: attempt.status,

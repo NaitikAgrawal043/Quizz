@@ -6,7 +6,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   await dbConnect();
   try {
     const { id } = await params;
-    const test = await Test.findById(id).lean();
+    const test = await Test.findById(id).populate('batches', 'name').lean();
     if (!test) {
       return NextResponse.json({ error: 'Test not found' }, { status: 404 });
     }
@@ -26,7 +26,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       id,
       body,
       { new: true }
-    ).lean();
+    ).populate('batches', 'name').lean();
 
     if (!updatedTest) {
       return NextResponse.json(

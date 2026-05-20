@@ -56,6 +56,7 @@ export interface ITest extends Document {
   revealAnswersPolicy: 'after_grading' | 'immediate_after_expiry' | 'embargo';
   status: 'draft' | 'published' | 'archived';
   createdBy: mongoose.Types.ObjectId;
+  testDate?: Date;
   createdAt: Date;
 }
 
@@ -177,6 +178,7 @@ const TestSchema = new Schema<ITest>({
   revealAnswersPolicy: { type: String, enum: ['after_grading', 'immediate_after_expiry', 'embargo'], default: 'after_grading' },
   status: { type: String, enum: ['draft', 'published', 'archived'], default: 'draft' },
   createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  testDate: { type: Date },
   createdAt: { type: Date, default: Date.now },
 });
 

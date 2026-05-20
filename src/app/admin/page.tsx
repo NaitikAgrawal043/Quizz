@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PlusCircle, FileText, Trash2, Radio, Loader2 } from 'lucide-react';
+import { PlusCircle, FileText, Trash2, Radio, Loader2, Calendar, Users } from 'lucide-react';
 import { useTests } from '@/hooks/queries/useTests';
 import { useDeleteTest } from '@/hooks/mutations/useDeleteTest';
 
@@ -87,9 +87,42 @@ export default function AdminDashboard() {
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                    <p className="text-sm text-muted-foreground">
-                                        Created: {new Date(test.createdAt).toLocaleDateString()}
-                                    </p>
+                                    <div className="space-y-3">
+                                        <div className="flex flex-wrap gap-1 text-[11px] items-center">
+                                            <span className="font-semibold text-muted-foreground mr-1">Batches:</span>
+                                            {test.batches && test.batches.length > 0 ? (
+                                                test.batches.map((b: any) => (
+                                                    <span key={typeof b === 'object' ? b._id : b} className="px-2 py-0.5 rounded bg-secondary text-secondary-foreground font-medium">
+                                                        {typeof b === 'object' ? b.name : b}
+                                                    </span>
+                                                ))
+                                            ) : (
+                                                <span className="px-2 py-0.5 rounded bg-muted text-muted-foreground">No Batch</span>
+                                            )}
+                                        </div>
+
+                                        {test.testDate ? (
+                                            <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 dark:text-emerald-400 px-2.5 py-1 rounded-full w-fit">
+                                                <Calendar className="h-3.5 w-3.5" />
+                                                <span>
+                                                    {new Date(test.testDate).toLocaleString(undefined, {
+                                                        year: 'numeric',
+                                                        month: 'short',
+                                                        day: 'numeric',
+                                                        hour: 'numeric',
+                                                        minute: '2-digit',
+                                                        hour12: true
+                                                    })}
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <div className="text-xs text-muted-foreground italic">Not scheduled yet</div>
+                                        )}
+
+                                        <p className="text-[10px] text-muted-foreground">
+                                            Created: {new Date(test.createdAt).toLocaleDateString()}
+                                        </p>
+                                    </div>
                                     <div className="mt-4 flex gap-2">
                                          <Link href={`/admin/tests/${test._id}/edit`}>
                                         {/* <Link href={`/admin/tests/${test._id}/upload`}> */}

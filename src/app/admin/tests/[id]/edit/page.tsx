@@ -20,18 +20,31 @@ export default function EditTestPage() {
 
     const [title, setTitle] = useState('');
     const [status, setStatus] = useState('draft');
+    const [testDate, setTestDate] = useState('');
 
     // Populate form once data loads
     useEffect(() => {
         if (test) {
             setTitle(test.title);
             setStatus(test.status);
+            if (test.testDate) {
+                const date = new Date(test.testDate);
+                const tzOffset = date.getTimezoneOffset() * 60000;
+                const formatted = new Date(date.getTime() - tzOffset).toISOString().slice(0, 16);
+                setTestDate(formatted);
+            } else {
+                setTestDate('');
+            }
         }
     }, [test]);
 
     const handleUpdate = async () => {
         try {
-            await updateTest.mutateAsync({ title, status });
+            await updateTest.mutateAsync({
+                title,
+                status,
+                testDate: testDate ? new Date(testDate).toISOString() : undefined
+            });
             router.push('/admin');
         } catch {
             alert('Failed to update test');
@@ -66,6 +79,15 @@ export default function EditTestPage() {
                                 <SelectItem value="published">Published</SelectItem>
                             </SelectContent>
                         </Select>
+                    </div>
+                    <div>
+                        <label className="text-sm font-medium">Test Scheduled/Conducted Date</label>
+                        <Input
+                            type="datetime-local"
+                            value={testDate}
+                            onChange={(e) => setTestDate(e.target.value)}
+                            required
+                        />
                     </div>
                     <Button onClick={handleUpdate} disabled={updateTest.isPending}>
                         {updateTest.isPending ? (

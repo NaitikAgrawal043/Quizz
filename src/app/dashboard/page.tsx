@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Clock, ArrowRight, Loader2, FileText, BarChart3 } from 'lucide-react';
+import { Clock, ArrowRight, Loader2, FileText, BarChart3, Calendar } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { useUserAttempts } from '@/hooks/queries/useUserAttempts';
 
@@ -81,7 +81,7 @@ export default function UserDashboard() {
                             <CardHeader className="pb-3">
                                 <CardTitle className="leading-tight text-xl">{test.title}</CardTitle>
                             </CardHeader>
-                            <CardContent className="pb-3">
+                            <CardContent className="pb-3 space-y-2">
                                 <div className="flex items-center gap-4 text-sm text-muted-foreground">
                                     <div className="flex items-center gap-1.5">
                                         <Clock className="h-4 w-4" />
@@ -92,6 +92,21 @@ export default function UserDashboard() {
                                         <span>Exam</span>
                                     </div>
                                 </div>
+                                {test.testDate && (
+                                    <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 dark:text-emerald-400 px-2.5 py-1 rounded-full w-fit mt-1">
+                                        <Calendar className="h-3.5 w-3.5" />
+                                        <span>
+                                            Scheduled: {new Date(test.testDate).toLocaleString(undefined, {
+                                                year: 'numeric',
+                                                month: 'short',
+                                                day: 'numeric',
+                                                hour: 'numeric',
+                                                minute: '2-digit',
+                                                hour12: true
+                                            })}
+                                        </span>
+                                    </div>
+                                )}
                             </CardContent>
                             <CardFooter className="pt-3 border-t bg-muted/5">
                                 {!test.attempt ? (

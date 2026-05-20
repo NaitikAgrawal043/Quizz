@@ -5,7 +5,8 @@ export interface TestSummary {
     title: string;
     status: string;
     createdAt: string;
-    batches: string[];
+    batches: Array<string | { _id: string; name: string }>;
+    testDate?: string;
 }
 
 export function useTests(enabled = true) {
